@@ -5,7 +5,7 @@ var FriendlyErrorsPlugin = require('friendly-errors-webpack-plugin')
 
 module.exports = {
 	entry: [
-		'./src/main.js'
+		'./src/client/main.js'
 	],
 	output: {
 		path: path.resolve(__dirname, './dist'),
@@ -46,7 +46,7 @@ module.exports = {
 		new webpack.NoEmitOnErrorsPlugin(),
 		new HtmlWebpackPlugin({
 			filename: 'index.html',
-			template: './src/index.html',
+			template: './src/client/index.html',
 			inject: true
 		})
 	],

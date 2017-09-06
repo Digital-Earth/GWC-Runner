@@ -16,7 +16,7 @@ if (process.env.NODE_ENV === 'production') {
 	var config = require('./server/config');
 
 	const webpack = require('webpack');
-	const webpackConfig = require('./webpack.config');
+	const webpackConfig = require('../webpack.config');
 	const compiler = webpack(webpackConfig);
 	
 	// Create the app, setup the webpack middleware
