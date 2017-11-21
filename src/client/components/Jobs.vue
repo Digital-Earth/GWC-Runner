@@ -6,24 +6,35 @@
 		<job class="job" v-for="job in jobs" v-bind:key="job.id" v-bind:job="job" v-on:close="removeJob(job)"></job>
 
 		<h2>DataSets</h2>
-		<button @click="startListJob()">Refresh	</button>
-		<h2 v-if="datasets.total > 0">From {{datasets.total}} Dataset, {{datasets.working}} are working</h2>
-		
-		<div class="url-info" v-for="url in urls" v-bind:key="url.url">
-			<div class="background green" v-bind:style="{ width: url.working +'%'}"></div>
-			<div class="background red" v-bind:style="{ width: 100 * url.broken / url.datasets  +'%'}"></div>
-			<div class="details">
-				<div class="section">{{url.url}}</div>
-				<div class="section">{{url.status}} - {{url.working}}% of {{url.datasets}}</div>
-				<div class="section">
-					<button @click="startDiscoverJob(url.url)">Discover</button>
-					<button @click="startValidateJob(url.url)">Validate</button>
+		<button @click="startListJob()">Refresh</button>
+		<div v-if="datasets.total > 0">
+			<h2>From {{datasets.total}} Dataset, {{datasets.working}} are working</h2>
+			
+			<div class="url-info" v-for="url in urls" v-bind:key="url.url">
+				<div class="background green" v-bind:style="{ width: url.working +'%'}"></div>
+				<div class="background red" v-bind:style="{ width: 100 * url.broken / url.datasets  +'%'}"></div>
+				<div class="details">
+					<div class="section small">{{url.status}}</div>
+					<div class="section small">{{url.working}}% of {{url.datasets}}</div>
+					<div class="section">{{url.url}}</div>
+					<div class="actions">
+						<button @click="startDiscoverJob(url.url)">Discover</button>
+						<button @click="startValidateJob(url.url)">Validate</button>
+					</div>
 				</div>
 			</div>
+
+			<div>
+				<input v-model="newUrl" @key-up:enter="addNewUrl()"><button @click="addNewUrl">Add</button>
+			</div>
 		</div>
+		
 
 		<h2>GeoSources</h2>
 		<button @click="startGalleryStatusStatusJob()">Refresh</button>
+		<div>
+			<input v-model="geoSourceId" @key-up:enter="checkGeoSource()"><button @click="checkGeoSource">Check</button>
+		</div>
 		<div class="url-info" v-for="geoSource in geoSources" v-bind:key="geoSource.id"  v-bind:class="{error: !geoSource.working}">
 			<div class="details">
 				<div class="section">{{geoSource.id}}</div>
@@ -52,6 +63,8 @@ export default {
 			jobs: [],
 			urls: [],
 			geoSources: [],
+			newUrl: "",
+			geoSourceId: ""
 		}
 	},
 	methods: {
@@ -114,6 +127,12 @@ export default {
 		startValidateJob(url) {
 			this.$socket.emit('start-validate',url);
 		},
+		addNewUrl() {
+			if (this.newUrl.startsWith('http://') || this.newUrl.startsWith('https://')) {
+				this.$socket.emit('start-add-url',this.newUrl);
+				this.newUrl = "";
+			}
+		},
 
 
 		startGalleryStatusStatusJob() {
@@ -121,6 +140,9 @@ export default {
 		},
 		updateGalleryStatus(geoSources) {
 			this.geoSources = geoSources;
+		},
+		checkGeoSource() {
+			this.$socket.emit('start-gallery-status',this.geoSourceId);
 		},
 
 		startDownloadJob(id) {
@@ -196,15 +218,26 @@ export default {
 
 .url-info {
 	border: 1px solid #888;
-	padding: 10px;
 	margin: 10px;
 	position: relative;
 }
 
 .url-info .section {
 	display: inline-block;
-	width: 20%;
-	z-index: 100;
+	position: relative;
+	overflow: hidden;
+	padding: 10px;
+}
+
+.url-info .section.small {
+	width: 200px;
+	border-right: 1px solid #aaa;
+}
+
+.url-info .actions {
+	position: absolute;
+	right: 10px;
+	top: 10px;
 }
 
 .url-info .background {
@@ -228,6 +261,7 @@ export default {
 	left: 0;
 	top: 0;
 	width: 100%;
+	text-align: left;
 }
 .url-info.error {
 	background-color: #faa;

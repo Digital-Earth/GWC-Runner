@@ -3,6 +3,7 @@ var JobManager = require('./JobManager');
 var config = require('./config');
 
 var Jobs = {
+	addUrl: require('./jobs/add'),
 	listUrls: require('./jobs/list'),
 	validateUrl: require('./jobs/validate'),
 	discoverUrl: require('./jobs/discover'),
@@ -23,7 +24,7 @@ Api.attach = function (server) {
 			status: job.status,
 			usage: job.usage || { cpu: 0, memory:0},
 			info: job.info || {},
-			log: job.logTail || []
+			log: job.logParser.logTail || []
 		}
 	}
 
@@ -57,7 +58,18 @@ Api.attach = function (server) {
 		});
 
 		socket.on('start-add-url', function(url) {
-			JobManager.performJob(Jobs.addUrl(url));
+			var job = Jobs.addUrl(url);
+			JobManager.performJob(job);
+
+			//auto invoke discover
+			job.on('exit', function (job) {
+				if (job.data.urls) {
+					var urlReport = job.data.urls[0];
+					if (urlReport && urlReport.Status == 'New') {
+						JobManager.performJob(Jobs.discoverUrl(url));
+					}
+				}
+			});
 		})
 
 		socket.on('start-validate', function(url) {
@@ -94,8 +106,8 @@ Api.attach = function (server) {
 			JobManager.performJob(Jobs.startGwc('import-geosource','pyxis://'+id));
 		});
 
-		socket.on('start-gallery-status', function() {
-			var job = Jobs.startGwc('gallery-status');
+		socket.on('start-gallery-status', function(id) {
+			var job = Jobs.startGwc('gallery-status',id);
 			JobManager.performJob(job);
 
 			job.on('exit', function() {
