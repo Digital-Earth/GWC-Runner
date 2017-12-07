@@ -30,19 +30,21 @@ function startGWC(type, id) {
 		'name': 'GWC',
 		'info': {
 			type: type,
-			gwc: true,
 		}
 	};
 
 	switch (type) {
 		case 'master':
 			url = config.gwc.masterHost + ':' + config.gwc.masterPorts[id]
+			jobDetails.info.gwc = true;
 			break;
 		case 'server':
 			url += config.gwc.serverPorts[id]
+			jobDetails.info.gwc = true;
 			break;
 		case 'import':
 			url += config.gwc.importPorts[id]
+			jobDetails.info.gwc = true;
 			break;
 		case 'validate-checksum':
 			url = '';
@@ -61,14 +63,10 @@ function startGWC(type, id) {
 			break;
 		case 'gallery-status':
 			jobDetails.args.push('-gs');
-			url = '';
-			jobDetails.on.automation = function (job, command, key, value) {
-				if (command == 'PUSH') {
-					job.data = job.data || {};
-					job.data[key] = job.data[key] || [];
-					job.data[key].push(value);
-				}
+			if (id) {
+				jobDetails.args.push('pyxis://' + id);
 			}
+			url = '';
 			jobDetails.on.exit = function (job) {
 				JobManager.geoSources = job.data.geoSources;
 			}

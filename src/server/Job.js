@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const EventEmitter = require('events');
 const processUsage = require('pidusage');
+const JobLogParser = require('./JobLogParser');
 
 const StatusCodes = {
 	'new': 'new',
@@ -38,8 +39,12 @@ class Job {
 			//default info is empty
 			info: {},
 
-			//to parse the stdout and look for '*** UPDATE *** key=value and update the process info
-			updateInfoFromStdout: true,
+			//default data is empty
+			data: {},
+
+			//log parser, that go over every line
+			//default log parser look for '*** [COMMAND] *** key=value'
+			logParser: new JobLogParser(),
 		}
 
 		options = extend({}, defaults, options)
@@ -57,8 +62,8 @@ class Job {
 		this.updateInfoFromStdout = options.updateInfoFromStdout;
 
 		this.logFile = options.logFile;
-		this.logTail = [];
-
+		this.logParser = options.logParser;
+		
 		if (this.logFile) {
 			this.logStream = fs.createWriteStream(this.logFile);
 		}
@@ -94,6 +99,15 @@ class Job {
 
 		var stdout = '';
 
+		function parseLine(line) {
+			var parseResult;
+			if (line) {
+				parseResult = self.logParser.parseLine(self, line);
+				self.ee.emit('line', self, line);
+			}
+			return parseResult;
+		}
+
 		child.stdout.on('data', function (data) {
 			if (self.logStream) {
 				self.logStream.write(data);
@@ -109,47 +123,9 @@ class Job {
 				var pos = stdout.indexOf('\n');
 				var line = stdout.substr(0, pos);
 				stdout = stdout.substr(pos + 1);
-				if (line) {
-					var automationLine = false;
 
-					//search for automation lines:
-					// *** UPDATE ** key=value - is handled by default
-					// *** PUSH *** key=value or any other command if will emit 'automation' event for job to handle
-					if (self.updateInfoFromStdout && line.startsWith('*** ')) {
-						var groups = line.match(/\*\*\* (\w+) \*\*\*\s*(\S+)\s*\=(.*)/);
-						if (groups) {
-							
-							var command = groups[1].trim();
-							var key = groups[2].trim();
-							var value = groups[3].trim();
-							try {
-								value = JSON.parse(value);
-							} catch(error) {
-								value = error;
-							}
-							switch(command) {
-								case 'UPDATE':
-									self.info[key] = value;
-									infoUpdated = true;
-									automationLine = true;
-									break;
-								default:
-									if (self.ee.emit('automation',self,command,key,value)) {
-										automationLine = true;
-									}
-							}
-						}
-					} 
-					
-					//add into log if not automation line
-					if (!automationLine) {
-						self.logTail.push(line);
-						if (self.logTail.length > 10) {
-							self.logTail.shift();
-						}
-					}
-
-					self.ee.emit('line', self, line);
+				if (parseLine(line)=='info') {
+					infoUpdated = true;
 				}
 			}
 
@@ -167,9 +143,8 @@ class Job {
 
 		child.on('exit', function (code) {
 			//emit the last line
-			if (stdout) {
-				self.ee.emit('line', self, stdout);
-			}
+			parseLine(stdout);
+			
 			self.exitCode = code;
 			self.status = StatusCodes.done;
 
