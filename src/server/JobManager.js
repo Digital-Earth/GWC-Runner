@@ -20,7 +20,11 @@ var JobManager = {
 				JobManager.completedJobs.pop();
 			}
 		})
-	},
+    },
+    updateRoots(roots) {
+        this.roots = roots;
+        ee.emit('roots-updated', roots);
+    },
 	performJob(job) {
 		job.start();
 		job.on('error', function(job,error) {
