@@ -36,7 +36,7 @@ const server = new http.Server(app);
 
 //install socket.io api
 var api = require('./server/api');
-api.attach(server);
+api.attach(server, app);
 
 if (config.production) {
 	api.startGwc();

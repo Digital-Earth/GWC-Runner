@@ -3,6 +3,13 @@ module.exports = {
 		cwd: 'c:\\pyxis\\trunk2\\application\\PyxisCLI\\bin\\Release',
 		exec: 'c:\\pyxis\\trunk2\\application\\PyxisCLI\\bin\\Release\\pyx.exe',
 	},
+	proxy: {
+		cwd: 'c:\\pyxis\\repos\\GwcProxy',
+		exec: 'c:\\Program Files\\nodejs\\node.exe',
+		start: 'server.js',
+		
+		keepAlive: true
+	},
 	gwc: {
 		cwd: 'c:\\pyxis\\trunk2\\application\\GeoWebCore\\bin\\Release',
 		exec: 'c:\\pyxis\\trunk2\\application\\GeoWebCore\\bin\\Release\\GeoWebCore.exe',

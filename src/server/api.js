@@ -7,12 +7,13 @@ var Jobs = {
 	listUrls: require('./jobs/list'),
 	validateUrl: require('./jobs/validate'),
 	discoverUrl: require('./jobs/discover'),
-	startGwc: require('./jobs/gwc')
+	startGwc: require('./jobs/gwc'),
+	startProxy: require('./jobs/proxy')
 }
 
 var Api = {}
 
-Api.attach = function (server) {
+Api.attach = function (server, app) {
 	console.log('setup socket.io API');
 
 	var io = require('socket.io')(server);
@@ -88,6 +89,14 @@ Api.attach = function (server) {
 			})
 		})
 
+		socket.on('start-proxy', function(url) {
+			Api.startProxy();
+		});
+
+		socket.on('stop-proxy', function(url) {
+			Api.stopProxy();
+		});
+
 		socket.on('start-gwc', function() {
 			Api.startGwc();
 		});
@@ -117,6 +126,17 @@ Api.attach = function (server) {
 
 		/* END - ALL LEGACY STUFF */		
 	});
+
+	app.get('/node', function(req,res) {
+		res.send(JSON.stringify(JobManager.jobs.map(function(job) {
+			return {
+				id: job.id,
+				name: job.name,
+				status: job.status,
+			};
+		})));
+		res.end();
+	});
 }
 
 Api.startGwc = function() {
@@ -133,6 +153,18 @@ Api.startGwc = function() {
 Api.stopGwc = function() {
 	config.gwc.keepAlive = false;
 	JobManager.find({gwc:true}).forEach(job=>job.kill());
+}
+
+Api.startProxy = function() {
+	config.proxy.keepAlive = true;
+	if (JobManager.find({proxy:true}).length == 0) {
+		JobManager.performJob(Jobs.startProxy('http://localhost:1337'));
+	}
+}
+
+Api.stopProxy = function() {
+	config.proxy.keepAlive = false;
+	JobManager.find({proxy:true}).forEach(job=>job.kill());
 }
 
 module.exports = Api;

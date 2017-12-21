@@ -1,7 +1,8 @@
 <template>
 	<div>
 		<h1>Jobs Runner {{connected?'connected':'disconnected'}}</h1>
-		<toggle-button @change="toggleGWC" :sync="true" :value="gwcRunning"></toggle-button> GWC
+		<toggle-button @change="toggleGWC" :sync="true" :value="gwcRunning"></toggle-button> GWC<br>
+		<toggle-button @change="toggleProxy" :sync="true" :value="proxyRunning"></toggle-button> Proxy<br>
 		<h2>Jobs <button style="float:right;margin-right:10px" @click="clearAllDone()">Clear All Done</button></h2>
 		<job class="job" v-for="job in jobs" v-bind:key="job.id" v-bind:job="job" v-on:close="removeJob(job)"></job>
 
@@ -60,6 +61,7 @@ export default {
 		return {
 			connected: false,
 			gwcRunning: false,
+			proxyRunning: false,
 			jobs: [],
 			urls: [],
 			geoSources: [],
@@ -152,12 +154,19 @@ export default {
 			this.$socket.emit('start-import-geosource',id);
 		},
 
-
 		toggleGWC(event) {
 			if (event.value) {
 				this.$socket.emit('start-gwc');
 			} else {
 				this.$socket.emit('stop-gwc');
+			}
+		},
+
+		toggleProxy(event) {
+			if (event.value) {
+				this.$socket.emit('start-proxy');
+			} else {
+				this.$socket.emit('stop-proxy');
 			}
 		}
 	},
