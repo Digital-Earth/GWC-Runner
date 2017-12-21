@@ -55,7 +55,6 @@ export default {
       this.state.jobs.forEach(job => {
         if (job.status != "done") count++;
       });
-      console.log("count", count);
       return count;
     }
   },

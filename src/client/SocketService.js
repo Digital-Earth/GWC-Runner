@@ -22,9 +22,11 @@ export default {
 		socket.on('jobs', function(jobs) {
 			store.state.jobs = jobs;
 			updateUrlsActive();
+			updateRunningServices();
 			store.emit('jobs',store.state.jobs);
 		});
 		socket.on('job-update', function(jobUpdate) {
+			let jobFound = false;
 			for(let i=0;i<store.state.jobs.length;i++) {
 				let job = store.state.jobs[i];
 				if (job.id === jobUpdate.id) {
@@ -32,14 +34,35 @@ export default {
 					job.usage = jobUpdate.usage;
 					job.info = jobUpdate.info;
 					job.log = jobUpdate.log;
-					return;
+					jobFound = true;
+					break;
 				}
 			}
-			//if we got here, this is a new job
-			store.state.jobs.unshift(jobUpdate);
+			if (!jobFound) {
+				//if we got here, this is a new job
+				store.state.jobs.unshift(jobUpdate);
+			}
 			updateUrlsActive();
+			updateRunningServices();
 			store.emit('jobs',store.state.jobs);
 		});
+
+		function updateRunningServices() {
+			store.state.services.gwc = false;
+			store.state.services.proxy = false;
+			store.state.jobs.forEach((job) => {
+				if (job.status === "running") {
+					
+					if (job.info.gwc) {
+						store.state.services.gwc = true;
+					}
+
+					if (job.info.type === 'proxy') {
+						store.state.services.proxy = true;
+					}
+				}
+			});
+		}
 		function updateUrlsActive () {
 			let activeUrls = {};
 			store.state.jobs.forEach((job) => {

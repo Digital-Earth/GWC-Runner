@@ -4,7 +4,11 @@ let vm = new Vue();
 
 export default {
     state: {
-        conntected: false,
+        connected: false,
+        services: {
+            gwc:false,
+            proxy: false 
+        },
         jobs: [],
         urls: [],
         geoSources: [],

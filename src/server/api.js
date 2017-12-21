@@ -201,14 +201,14 @@ Api.stopGwc = function () {
 
 Api.startProxy = function() {
 	config.proxy.keepAlive = true;
-	if (JobManager.find({proxy:true}).length == 0) {
+	if (JobManager.find({type:'proxy'}).length == 0) {
 		JobManager.performJob(Jobs.startProxy('http://localhost:1337'));
 	}
 }
 
 Api.stopProxy = function() {
 	config.proxy.keepAlive = false;
-	JobManager.find({proxy:true}).forEach(job=>job.kill());
+	JobManager.find({type:'proxy'}).forEach(job=>job.kill());
 }
 
 module.exports = Api;

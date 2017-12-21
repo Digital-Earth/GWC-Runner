@@ -23,7 +23,7 @@
                         </v-card-title>
                         <v-card-text class="px-0">
                             <div class="display-3">
-                                <toggle-button @change="toggleProxy" :sync="true" :value="gwcProxy"></toggle-button> Proxy
+                                <toggle-button @change="toggleProxy" :sync="true" :value="proxyRunning"></toggle-button> Proxy
                             </div>
                         </v-card-text>
                     </v-card>
@@ -142,8 +142,8 @@ export default {
             barThickness: 10
         }
       },
-      gwcRunning: false,
-      proxyRunning: false
+      gwcRunning: store.state.services.gwc ? true : false,
+      proxyRunning: store.state.services.proxy ? true : false
     };
   },
   methods: {
@@ -233,9 +233,8 @@ export default {
     runningJobs: function() {
         let count = 0;
         this.state.jobs.forEach(job => {
-        if (job.status != "done") count++;
+            if (job.status != "done") count++;
         });
-        console.log("count", count);
         return count;
     }
   },
