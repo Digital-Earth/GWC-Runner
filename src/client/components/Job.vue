@@ -151,10 +151,10 @@ export default {
 }
 
 .job .header.running {
-	background-color: #afa;
+	background-color: #32a323;
 }
 
 .job .header.running.high-cpu {
-	background-color: #4a4;
+	background-color:#a59a21;
 }
 </style>
