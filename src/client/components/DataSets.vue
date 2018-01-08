@@ -1,26 +1,54 @@
 <template>
 	<div>
-		<h2>DataSets</h2>
+		<h2>DataSets <v-btn round color="primary" @click="startListJob()"><v-icon>refresh</v-icon></v-btn></h2>
 		
-		<v-layout row>
-			<v-flex xs1>
-				<v-btn round color="primary" dark @click="startListJob()">Refresh</v-btn>
-			</v-flex>
-			<v-flex xs4>
-				<v-btn round color="primary" dark @click="startAutoDiscoveryJob()" v-bind:disabled="autoDiscovery.active">Auto-Discovery {{autoDiscoveryStatus}}</v-btn>
-			</v-flex>
-            <v-flex xs6>
-              <v-text-field
-                name="input-1"
-                label="Add New Url"
-				v-model="newUrl" @key-up:enter="addNewUrl()"
-                dark
-              ></v-text-field>
-            </v-flex>
-			<v-flex xs1>
-				<v-btn round color="primary" dark @click="addNewUrl">Add</v-btn>
-			</v-flex>
-		</v-layout>
+    <v-container grid-list-md text-xs-center>
+      <v-layout row wrap>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%">
+            <v-card-title primary-title >
+                <div class="headline text-xs-center">Discover</div>
+                <v-spacer></v-spacer>
+                <v-btn round color="primary" dark @click="startAutoDiscoveryJob()" v-bind:disabled="autoDiscovery.active" ><v-icon>play_arrow</v-icon></v-btn>
+            </v-card-title>
+             <v-card-text class="px-0">
+              <v-expansion-panel class="elevation-0">
+                <v-expansion-panel-content>
+                  <div slot="header">Options</div>              
+                  <v-layout row wrap align-center>
+                    <v-flex xs1></v-flex>
+                    <v-flex xs8>
+                      <v-slider 
+                        id="parallel"
+                        min=1
+                        max=10
+                        step=1            
+                        v-model="parallel">
+                      </v-slider>
+                    </v-flex>
+                    <v-flex xs2 fill-height=true class="title text-xs-right">
+                      {{parallel}} Jobs
+                    </v-flex>
+                  </v-layout>
+                  <v-layout row wrap align-center>
+                    <v-flex xs1></v-flex>
+                    <v-flex xs10>
+                      <v-text-field 
+                      label="Tags"
+                        type="string"
+                        id="tags"
+                        v-model="tags">
+                      </v-text-field>
+                    </v-flex>
+                  </v-layout>
+                </v-expansion-panel-content>
+              </v-expansion-panel>
+              
+             </v-card-text>
+          </v-card>
+        </v-flex>
+      </v-layout>
+    </v-container>
 
 
 		<v-card>
@@ -77,30 +105,21 @@
 			</v-data-table>
 		</v-card>
 
+    <v-layout row>
+      <v-flex xs1></v-flex>
+      <v-flex xs9>
+        <v-text-field
+          name="input-1"
+          label="Add New Url"
+	  			v-model="newUrl" @key-up:enter="addNewUrl()"
+          dark>
+        </v-text-field>
+        </v-flex>
+		  	<v-flex xs1>
+			  	<v-btn round color="primary" dark @click="addNewUrl">Add</v-btn>
+			  </v-flex>
+		  </v-layout>
 
-
-<!--
-		<div v-if="datasets.total > 0">
-			<h3>{{datasets.working}} Working from {{datasets.total}} Dataset</h3>
-			
-			<div class="url-info" v-for="url in state.urls" v-bind:key="url.url">
-				<div class="background-container">
-					<div class="background green" v-bind:style="{ width: url.working +'%'}"></div>
-					<div class="background red" v-bind:style="{ width: 100 * url.broken / url.datasets  +'%'}"></div>
-				</div>
-				<div class="details">
-					<div class="section small">{{url.status}}</div>
-					<div class="section small">{{url.working}}% of {{url.datasets}}</div>
-					<div class="section">{{url.url}}</div>
-					<div class="actions">
-						<v-btn small color="primary" dark @click="startDiscoverJob(url.url)">Discover</v-btn>
-						<v-btn small color="primary" dark @click="startValidateJob(url.url)">Validate</v-btn>
-					</div>
-				</div>
-			</div>
-		</div>	
--->
-		
 	</div>
 </template>
 
@@ -112,6 +131,7 @@ export default {
   data() {
     return {
       state: store.state,
+      parallel: 3,
       max25chars: v => v.length <= 25 || "Input too long!",
       tmp: "",
       search: "",

@@ -9,9 +9,11 @@ export default {
             gwc:false,
             proxy: false 
         },
-        jobs: [],
         urls: [],
         geoSources: [],
+        nodes: [],
+        jobs: [],
+        tasks: [],
     },
     // aggregate a list by fields:
     // usage: store.aggregate(store.state.urls,'verified','unknown','broken') -> { verified: 1212, ... }

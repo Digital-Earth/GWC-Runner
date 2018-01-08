@@ -1,16 +1,10 @@
+let serverContext = require('./ServerContext');
 var Job = require('./Job');
-var JobManager = require('./JobManager');
 var config = require('./config');
 
-var Jobs = {
-	addUrl: require('./jobs/add'),
-	listUrls: require('./jobs/list'),
-	validateUrl: require('./jobs/validate'),
-	updateUrl: require('./jobs/update'),
-	discoverUrl: require('./jobs/discover'),
-	startGwc: require('./jobs/gwc'),
-	startProxy: require('./jobs/proxy')
-}
+const { ClusterTaskManager, LocalTaskManager } = require('./TaskManager');
+
+const createGwcDetails = require('./jobs/gwc');
 
 var Api = {}
 
@@ -19,129 +13,135 @@ Api.attach = function (server, app) {
 
 	var io = require('socket.io')(server);
 
-	function transformJob(job) {
+	let nodesSocket = io.of('/node');
+
+	serverContext.api = Api;
+	serverContext.config = config;
+	serverContext.cluster = new ClusterTaskManager(nodesSocket);
+	serverContext.cluster.addNode('local', new LocalTaskManager());
+
+	function transformTask(task) {
 		return {
-			id: job.id,
-			name: job.name,
-			status: job.status,
-			usage: job.usage || { cpu: 0, memory: 0 },
-			info: job.info || {},
-			log: job.logParser.logTail || []
+			id: task.id,
+			node: task.node,
+			name: task.name,
+			status: task.status,
+			details: task.details,
+			usage: task.usage || { cpu: 0, memory: 0 },
+			info: task.state || {},
+			log: task.log || []
 		}
 	}
 
-	function sendJobsUpdate() {
-		io.emit('jobs', JobManager.jobs.map(transformJob));
-		io.emit('urls', JobManager.roots || []);
-		io.emit('gallery-status', JobManager.geoSources || []);
+	function sendInitialUpdate() {
+		io.emit('tasks', serverContext.cluster.tasks().map(transformTask));
+		io.emit('roots', serverContext.roots || []);
+		io.emit('gallery-status', serverContext.geoSources || []);
+		sendCluster();
+		sendJobs();
 	}
 
-	function sendJobUpdate(job) {
-		io.emit('job-update', transformJob(job));
+	serverContext.on('roots', function (roots) {
+		io.emit('roots', roots || []);
+	});
+
+	serverContext.on('geoSources', function (geoSources) {
+		io.emit('gallery-status', serverContext.geoSources || []);
+	});
+
+	function sendTaskUpdate(task) {
+		io.emit('task-update', transformTask(task));
 	}
 
-	JobManager.on('job-started', function (job) {
-		io.emit('job-update', transformJob(job));
-		job.on('usage', sendJobUpdate)
-		job.on('info', sendJobUpdate)
-	});
-	JobManager.on('job-completed', function (job) {
-		io.emit('job-update', transformJob(job));
-		job.off('usage', sendJobUpdate);
-		job.off('info', sendJobUpdate)
-	})
+	function sendCluster() {
+		io.emit('cluster', serverContext.cluster.nodes() || []);
+	}
 
-	JobManager.on('roots-updated', function () {
-		io.emit('urls', JobManager.roots || []);
-	});
+	function sendJobs() {
+		io.emit('jobs', serverContext.jobs.map((job) => {
+			return {
+				id: job.id,
+				name: job.name,
+				status: job.status,
+			}
+		}));
+	}
+
+	serverContext.jobs = [];
+
+	Api.trackJob = function (job) {
+		job.on('start', function () {
+			serverContext.jobs.push(job);
+			sendJobs();
+		});
+
+		job.on('done', function () {
+			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
+			sendJobs();
+		});
+
+		job.on('cancelled', function () {
+			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
+			sendJobs();
+		});
+	}
+
+	serverContext.cluster.on('new-task', sendTaskUpdate);
+	serverContext.cluster.on('task-end', sendTaskUpdate);
+	serverContext.cluster.on('mutate', sendTaskUpdate);
+
+	serverContext.cluster.on('new-node', sendCluster);
+	serverContext.cluster.on('node-detach', sendCluster);
 
 	io.on('connection', (socket) => {
 		console.log('connected')
-		sendJobsUpdate();
 
-		socket.on('kill-job', function (jobId) {
-			JobManager.killJobWithId(jobId);
+		sendInitialUpdate();
+
+		socket.on('kill-task', function (taskId) {
+			serverContext.cluster.killTaskById(taskId);
 		});
 
 		socket.on('start-add-url', function (url) {
-			var job = Jobs.addUrl(url);
-			JobManager.performJob(job);
-
-			//auto invoke discover
-			job.on('exit', function (job) {
-				if (job.data.urls) {
-					var urlReport = job.data.urls[0];
-					if (urlReport && urlReport.Status == 'New') {
-						JobManager.performJob(Jobs.discoverUrl(url));
-					}
-				}
-			});
+			let job = Api.jobs.addUrl({ url: url });
+			Api.trackJob(job);
+			job.start();
 		})
 
-		function startValidationJob(url, onDone) {
-			onDone = onDone || function () { };
-
-			let job = Jobs.validateUrl(url);
-
-			job.on('exit', function (job) {
-				if (!job.info.root) {
-					let updateStatusJob = Jobs.updateUrl(url,'Broken');
-					updateStatusJob.on('exit',onDone);
-					JobManager.performJob(updateStatusJob);
-				}
-				else if (job.info.datasets > 0) {
-					startValidationJob(url, onDone);
-				} else {
-					onDone();
-				}
-			});
-
-			JobManager.performJob(job);
-		}
 
 		socket.on('start-validate', function (url) {
-			startValidationJob(url);
+			let job = Api.jobs.validate({ url: url });
+			Api.trackJob(job);
+			job.start();
 		})
 
 		socket.on('start-discover', function (url) {
-			JobManager.performJob(Jobs.discoverUrl(url));
+			let job = Api.jobs.discover({ url: url });
+			Api.trackJob(job);
+			job.start();
 		})
 
-		socket.on('start-discover-and-validate', function (urls) {
-			function discoverNextUrl() {
-				if (urls.length == 0) {
-					return;
-				}
-
-				let url = urls.shift();
-
-				let job = Jobs.discoverUrl(url);
-				job.on('exit', function (job) {
-					startValidationJob(url, discoverNextUrl);
-				});
-				JobManager.performJob(job);
-			}
-
-			//TODO: add settings to control how many jobs to run in parallel.
-			discoverNextUrl();
-			discoverNextUrl();
-			discoverNextUrl();
+		socket.on('start-discover-and-validate', function (urls, parallel) {
+			let job = Api.jobs.autoDiscover({ urls: urls, parallel: parallel || 3 });
+			Api.trackJob(job);
+			job.start();
 		})
 
 		socket.on('start-list', function (url) {
-			let job = Jobs.listUrls();
-			JobManager.performJob(job);
+			let job = Api.jobs.list({});
+			Api.trackJob(job);
+			job.start();
 		})
 
-		socket.on('start-proxy', function(url) {
+		socket.on('start-proxy', function (url) {
 			Api.startProxy();
 		});
 
-		socket.on('stop-proxy', function(url) {
+		socket.on('stop-proxy', function (url) {
 			Api.stopProxy();
 		});
 
-		socket.on('start-gwc', function() {
+		socket.on('start-gwc', function () {
 			Api.startGwc();
 		});
 
@@ -152,63 +152,259 @@ Api.attach = function (server, app) {
 		/* BEGIN - ALL LEGACY STUFF - CONSIDER REFACTOR */
 
 		socket.on('start-download-geosource', function (id) {
-			JobManager.performJob(Jobs.startGwc('download-geosource', 'pyxis://' + id));
+			let job = Api.jobs.gwcDownloadGeoSource({ id: id });
+			Api.trackJob(job);
+			job.start();
 		});
 
 		socket.on('start-import-geosource', function (id) {
-			JobManager.performJob(Jobs.startGwc('import-geosource', 'pyxis://' + id));
+			let job = Api.jobs.gwcImportGeoSource({ id: id });
+			Api.trackJob(job);
+			job.start();
 		});
 
 		socket.on('start-gallery-status', function (id) {
-			var job = Jobs.startGwc('gallery-status', id);
-			JobManager.performJob(job);
-
-			job.on('exit', function () {
-				io.emit('gallery-status', JobManager.geoSources || []);
-			})
+			let job = Api.jobs.gwcGalleryStatus({ id: id });
+			Api.trackJob(job);
+			job.start();
 		});
 
 		/* END - ALL LEGACY STUFF */
 	});
 
-	app.get('/node', function(req,res) {
-		res.send(JSON.stringify(JobManager.jobs.map(function(job) {
+	//rest API ?
+	app.get('/nodes', function (req, res) {
+		res.send(JSON.stringify(serverContext.cluster.nodes()));
+		res.end();
+	});
+
+	app.get('/jobs', function (req, res) {
+		res.send(JSON.stringify(serverContext.jobs.map((job) => {
 			return {
 				id: job.id,
 				name: job.name,
 				status: job.status,
-			};
+			}
 		})));
 		res.end();
 	});
 }
 
 Api.startGwc = function () {
-	config.gwc.keepAlive = true;
-	if (JobManager.find({ gwc: true }).length == 0) {
-		['master', 'server', 'import'].forEach(function (type) {
-			config.gwc[type + 'Ports'].forEach(function (port, index) {
-				JobManager.performJob(Jobs.startGwc(type, index));
-			});
-		});
-	}
+	Api.gwcJob = Api.jobs.gwc();
+	Api.trackJob(Api.gwcJob);
+	Api.gwcJob.start();
 }
 
 Api.stopGwc = function () {
-	config.gwc.keepAlive = false;
-	JobManager.find({ gwc: true }).forEach(job => job.kill());
+	Api.gwcJob.kill();
 }
 
-Api.startProxy = function() {
-	config.proxy.keepAlive = true;
-	if (JobManager.find({type:'proxy'}).length == 0) {
-		JobManager.performJob(Jobs.startProxy('http://localhost:1337'));
+Api.startProxy = function () {
+	Api.proxyJob = Api.jobs.proxy({ url: 'http://localhost:1337' });
+	Api.trackJob(Api.proxyJob);
+	Api.proxyJob.start();
+}
+
+Api.stopProxy = function () {
+	Api.proxyJob.kill();
+}
+
+Api.jobs = {
+	list: function (details) {
+		let job = new Job('list urls');
+
+		job.invoke({
+			cwd: config.cli.cwd,
+			exec: config.cli.exec,
+			args: ['url', 'list', '-json'],
+			name: 'list urls',
+			state: {
+				type: 'list',
+			}
+		}).then(function (taskState) {
+			let roots = taskState.data.roots.map((root) => {
+				return {
+					url: root.Uri,
+					status: root.Status,
+					datasets: root.DataSetCount,
+					working: Math.round(100 * root.VerifiedDataSetCount / root.DataSetCount),
+					broken: root.BrokenDataSetCount,
+					verified: root.VerifiedDataSetCount,
+					unknown: root.UnknownDataSetCount,
+					lastDiscovered: new Date(root.LastDiscovered),
+					lastVerified: new Date(root.LastVerified)
+				}
+			});
+			serverContext.emit('roots', roots);
+			return roots;
+		}).complete();
+
+		return job;
+	},
+	addUrl: function (details) {
+
+		let job = new Job('add url');
+		job.invoke({
+			cwd: config.cli.cwd,
+			exec: config.cli.exec,
+			args: ['url', 'add', details.url],
+			name: 'add ' + details.url,
+			state: {
+				type: 'add',
+				url: details.url
+			}
+		}).complete();
+
+		return job;
+	},
+	discover: function (details) {
+		let job = new Job('discover');
+
+		job.invoke({
+			cwd: config.cli.cwd,
+			exec: config.cli.exec,
+			args: ['url', 'discover', details.url],
+			name: 'discover ' + details.url,
+			state: {
+				type: 'discover',
+				url: details.url
+			}
+		}).complete();
+
+		return job;
+	},
+	validate: function (details) {
+
+		let job = new Job('validate')
+
+		job.keepAlive({
+			cwd: config.cli.cwd,
+			exec: config.cli.exec,
+			args: ['url', 'validate', '-n=50', '-clean', details.url],
+			name: 'validate ' + details.url,
+			state: {
+				type: 'validate',
+				url: details.url
+			}
+		}, {
+				while: function (taskState) {
+					if (taskState.state.root) {
+						let root = taskState.state.root;
+						serverContext.roots.forEach((url) => {
+							if (url.url === root.Uri) {
+								url.status = root.Status;
+								url.datasets = root.DataSetCount;
+								url.working = Math.round(100 * root.VerifiedDataSetCount / root.DataSetCount);
+								url.broken = root.BrokenDataSetCount;
+								url.verified = root.VerifiedDataSetCount;
+								url.unknown = root.UnknownDataSetCount;
+								url.lastDiscovered = new Date(root.LastDiscovered);
+								url.lastVerified = new Date(root.LastVerified);
+							}
+						});
+						serverContext.emit('roots', serverContext.roots);
+
+						return taskState.state.datasets > 0;
+					}
+					return false;
+				}
+			}).then(function (taskState) {
+				if (!taskState.state.root) {
+					return job.invoke({
+						cwd: config.cli.cwd,
+						exec: config.cli.exec,
+						args: ['url', 'update', '-status=Broken', details.url],
+						state: {
+							type: 'update',
+							url: details.url,
+							status: 'Broken'
+						}
+					});
+				} else if (taskState.state.root.status == 'Broken') {
+					return job.invoke({
+						cwd: config.cli.cwd,
+						exec: config.cli.exec,
+						args: ['url', 'update', '-status=Discovered', details.url],
+						state: {
+							type: 'update',
+							url: details.url,
+							status: 'Discovered'
+						}
+					});
+				}
+			}).complete();
+
+		return job;
+	},
+	discoverAndValidate: function (details) {
+		let job = new Job('discover and validate');
+
+		job.invoke(Api.jobs.discover(details))
+			.invoke(Api.jobs.validate(details))
+			.complete();
+
+		return job;
+	},
+	autoDiscover: function (details) {
+		let job = new Job('auto discover');
+
+		job.forEach(details.urls, function (url) {
+			return Api.jobs.discoverAndValidate({ url: url })
+		}, { parallel: details.parallel || 3 }).complete();
+
+		return job;
+	},
+	proxy: function (details) {
+		let job = new Job('proxy');
+
+		job.keepAlive({
+			cwd: config.proxy.cwd,
+			exec: config.proxy.exec,
+			args: [config.proxy.start, details.url],
+			name: 'proxy ' + details.url,
+			state: {
+				type: 'proxy',
+				url: details.url
+			}
+		});
+
+		return job;
+	},
+	gwc: function (details) {
+		let job = new Job('gwc');
+
+		['master', 'server', 'import'].forEach(function (type) {
+			config.gwc[type + 'Ports'].forEach(function (port, index) {
+				job.keepAlive(createGwcDetails(type, index));
+			})
+		});
+
+		return job;
+	},
+	gwcDownloadGeoSource: function (details) {
+		let job = new Job('download GeoSource');
+
+		job.invoke(createGwcDetails('download-geosource', 'pyxis://' + details.id)).complete();
+
+		return job;
+	},
+	gwcImportGeoSource: function (details) {
+		let job = new Job('import GeoSource');
+
+		job.invoke(createGwcDetails('import-geosource', 'pyxis://' + details.id)).complete();
+
+		return job;
+	},
+	gwcGalleryStatus: function (details) {
+		let job = new Job('gallery status');
+
+		job.invoke(createGwcDetails('gallery-status', details.id)).then((taskState) => {
+			serverContext.emit('geoSources', taskState.data.geoSources || []);
+		}).complete();
+
+		return job;
 	}
-}
-
-Api.stopProxy = function() {
-	config.proxy.keepAlive = false;
-	JobManager.find({type:'proxy'}).forEach(job=>job.kill());
 }
 
 module.exports = Api;

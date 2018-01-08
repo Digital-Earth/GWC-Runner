@@ -1,7 +1,7 @@
 module.exports = {
 	cli: {
-        cwd: 'c:\\PYXIS\\Source\\Trunk\\application\\PyxisCLI\\bin\\Release',
-        exec: 'c:\\PYXIS\\Source\\Trunk\\application\\PyxisCLI\\bin\\Release\\pyx.exe',
+        cwd: 'c:\\pyxis\\trunk2\\application\\PyxisCLI\\bin\\Release',
+        exec: 'c:\\pyxis\\trunk2\\application\\PyxisCLI\\bin\\Release\\pyx.exe',
 	},
 	proxy: {
 		cwd: 'c:\\pyxis\\repos\\GwcProxy',
@@ -11,8 +11,8 @@ module.exports = {
 		keepAlive: true
 	},
 	gwc: {
-        cwd: 'c:\\PYXIS\\Source\\Trunk\\application\\GeoWebCore\\bin\\Release',
-        exec: 'c:\\PYXIS\\Source\\Trunk\\application\\GeoWebCore\\bin\\Release\\GeoWebCore.exe',
+        cwd: 'c:\\pyxis\\trunk2\\application\\GeoWebCore\\bin\\Release',
+        exec: 'c:\\pyxis\\trunk2\\application\\GeoWebCore\\bin\\Release\\GeoWebCore.exe',
 			
 		cacheFolder: 'D:\\pyxis-gallery\\PYXCache\\',
 		filesFolder: 'D:\\pyxis-gallery\\UserFiles\\',

@@ -27,7 +27,6 @@
 					<router-view></router-view>
 				</v-container>
 			</v-content>
-			<v-footer app absolute></v-footer>
 		</v-app>
 	</div>
 </template>
@@ -43,25 +42,25 @@ export default {
       nav: true,
       items: [
         { title: "Home", icon: "home", href: "/" },
-        { title: "Jobs", icon: "playlist_play", href: "/jobs" },
+        { title: "Cluster", icon: "playlist_play", href: "/cluster" },
         { title: "DataSets", icon: "link", href: "/datasets" },
         { title: "GeoSources", icon: "folder", href: "/geosources"}
       ]
     };
   },
   computed: {
-    runningJobs: function() {
+    runningTasks: function() {
       let count = 0;
-      this.state.jobs.forEach(job => {
-        if (job.status != "done") count++;
+      this.state.tasks.forEach(task => {
+        if (task.status != "done") count++;
       });
       return count;
     }
   },
   methods: {
     displayCount(item) {
-      if (item.title == "Jobs") {
-        return this.runningJobs;
+      if (item.title == "Cluster") {
+        return this.runningTasks;
       } else {
         return "";
       }

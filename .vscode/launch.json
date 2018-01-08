@@ -7,6 +7,12 @@
 		{
 			"type": "node",
 			"request": "launch",
+			"name": "Debug Tests",
+			"program": "${workspaceRoot}\\node_modules\\jasmine\\bin\\jasmine.js",
+		},
+		{
+			"type": "node",
+			"request": "launch",
 			"name": "Launch Program",
 			"program": "${workspaceRoot}\\src\\app.js"
 		}

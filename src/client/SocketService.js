@@ -11,7 +11,7 @@ export default {
 		socket.on('disconnect', function() {
 			store.state.connected = false;
 		})
-		socket.on('urls', function(urls) {
+		socket.on('roots', function(urls) {
 			store.state.urls = urls;
 			updateUrlsActive();
             store.emit('urls',urls);
@@ -21,53 +21,64 @@ export default {
 		});
 		socket.on('jobs', function(jobs) {
 			store.state.jobs = jobs;
+		});
+		socket.on('tasks', function(tasks) {
+			store.state.tasks = tasks;
 			updateUrlsActive();
 			updateRunningServices();
-			store.emit('jobs',store.state.jobs);
+			store.emit('tasks',store.state.tasks);
 		});
-		socket.on('job-update', function(jobUpdate) {
-			let jobFound = false;
-			for(let i=0;i<store.state.jobs.length;i++) {
-				let job = store.state.jobs[i];
-				if (job.id === jobUpdate.id) {
-					job.status = jobUpdate.status;
-					job.usage = jobUpdate.usage;
-					job.info = jobUpdate.info;
-					job.log = jobUpdate.log;
-					jobFound = true;
+		socket.on('task-update', function(taskUpdate) {
+			let taskFound = false;
+			for(let i=0;i<store.state.tasks.length;i++) {
+				let task = store.state.tasks[i];
+				if (task.id === taskUpdate.id) {
+					task.status = taskUpdate.status;
+					task.usage = taskUpdate.usage;
+					task.info = taskUpdate.info;
+					task.log = taskUpdate.log;
+					taskFound = true;
 					break;
 				}
 			}
-			if (!jobFound) {
-				//if we got here, this is a new job
-				store.state.jobs.unshift(jobUpdate);
+			if (!taskFound) {
+				//if we got here, this is a new task
+				store.state.tasks.unshift(taskUpdate);
 			}
 			updateUrlsActive();
 			updateRunningServices();
-			store.emit('jobs',store.state.jobs);
+			store.emit('tasks',store.state.tasks);
 		});
 
 		function updateRunningServices() {
 			store.state.services.gwc = false;
 			store.state.services.proxy = false;
+			let jobNames = {};
 			store.state.jobs.forEach((job) => {
+				jobNames[job.id] = job.name;
 				if (job.status === "running") {
 					
-					if (job.info.gwc) {
+					if (job.name == 'gwc') {
 						store.state.services.gwc = true;
 					}
 
-					if (job.info.type === 'proxy') {
+					if (job.name == 'proxy') {
 						store.state.services.proxy = true;
 					}
+				}
+			});
+
+			store.state.tasks.forEach((task) => {
+				if (task.details.job) {
+					task.job = jobNames[task.details.job];
 				}
 			});
 		}
 		function updateUrlsActive () {
 			let activeUrls = {};
-			store.state.jobs.forEach((job) => {
-				if (job.status === "running" && job.info.url) {
-					activeUrls[job.info.url] = true;
+			store.state.tasks.forEach((task) => {
+				if (task.status === "running" && task.info.url) {
+					activeUrls[task.info.url] = true;
 				}
 			});
 
@@ -76,5 +87,9 @@ export default {
 				url.active = url.url in activeUrls;
 			});
 		}
+
+		socket.on('cluster', function(nodes) {
+			store.state.nodes = nodes;
+		});
     }
 }

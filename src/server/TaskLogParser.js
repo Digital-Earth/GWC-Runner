@@ -1,22 +1,15 @@
 var extend = require('extend');
 
-class JobLogParser {
+class TaskLogParser {
 
 	constructor(options) {
 		var defaults = {
 			commands: {
-				'UPDATE': function (job, key, value) {
-					if (job.info[key] !== value) {
-						job.info[key] = value;
-						return 'info';
-					}
-					return undefined;
+				'UPDATE': function (task, key, value) {
+					task.state.mutateState(key,value);
 				},
-				'PUSH': function (job, key, value) {
-					job.data = job.data || {};
-					job.data[key] = job.data[key] || [];
-					job.data[key].push(value);
-					return 'data';
+				'PUSH': function (task, key, value) {
+					task.state.mutateData(key, value);
 				}
 			},
 			logSize: 10,
@@ -28,8 +21,8 @@ class JobLogParser {
 		this.logTail = [];
 	}
 
-	parseLine(job, line) {
-		var groups = line.match(/\*\*\* (\w+) \*\*\*\s*(\S+)\s*\=(.*)/);
+	parseLine(task, line) {
+		var groups = line.match(/\*\*\* (\w+) \*\*\*\s*([^\s\=]+)\s*\=(.*)/);
 		if (groups) {
 
 			var command = groups[1].trim();
@@ -42,15 +35,19 @@ class JobLogParser {
 			}
 
 			if (command in this.commands) {
-				return this.commands[command](job, key, value);
+				this.commands[command](task, key, value);
+				return;
 			}
 		}
+		
+		//record line
+		task.state.mutateLog(line);
+
 		this.logTail.push(line);
 		if (this.logTail.length > this.logSize) {
 			this.logTail.shift();
 		}
-		return undefined;
 	}
 }
 
-module.exports = JobLogParser
+module.exports = TaskLogParser

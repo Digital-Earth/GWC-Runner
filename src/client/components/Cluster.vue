@@ -1,19 +1,27 @@
 <template>
 	<div>
-		<h2 class="space">Jobs
+		<h2 class="space">Jobs</h2>
+
+		<div class="task" v-for="job in state.jobs" v-bind:key="job.id">
+			<div class="header" v-bind:class="{ running: job.status == 'running'}">
+				{{job.name}} - {{job.id}}
+			</div>
+		</div>
+
+		<h2 class="space">Tasks
 			<v-btn round color="primary" dark style="float:right;margin-right:10px" @click="clearAllDone()">Clear All Done</v-btn>
 		</h2>
 
-		<job class="job" v-for="job in state.jobs" v-bind:key="job.id" v-bind:job="job" v-on:close="removeJob(job)"></job>
+		<task class="task" v-for="task in state.tasks" v-bind:key="task.id" v-bind:task="task" v-on:close="removeTask(task)"></task>
 	</div>
 </template>
 
 <script>
-import Job from './Job.vue'
+import Task from './Task.vue'
 import store from '../Store';
 
 export default {
-	name: 'jobs',
+	name: 'cluster',
 	data () {
 		return {
 			state: store.state,
@@ -26,41 +34,41 @@ export default {
 		}
 	},
 	methods: {
-		updateJobs(jobs) {
-			this.jobs = jobs
-			if (this.jobs.some(job=>job.info && job.info.gwc)) {
+		updateTasks(tasks) {
+			this.tasks = tasks
+			if (this.tasks.some(task=>task.info && task.info.gwc)) {
 				this.gwcRunning = true;
 			}
 		},
-		updateJob(jobUpdate) {
-			for(var i=0;i<this.jobs.length;i++) {
-				var job = this.jobs[i];
-				if (job.id === jobUpdate.id) {
-					job.status = jobUpdate.status;
-					job.usage = jobUpdate.usage;
-					job.info = jobUpdate.info;
-					job.log = jobUpdate.log;
+		updateTask(taskUpdate) {
+			for(var i=0;i<this.tasks.length;i++) {
+				var task = this.tasks[i];
+				if (task.id === taskUpdate.id) {
+					task.status = taskUpdate.status;
+					task.usage = taskUpdate.usage;
+					task.info = taskUpdate.info;
+					task.log = taskUpdate.log;
 					return;
 				}
 			}
-			//if we got here, this is a new job
-			this.jobs.unshift(jobUpdate);
+			//if we got here, this is a new task
+			this.tasks.unshift(taskUpdate);
 		},
 		clearAllDone() {
-			this.state.jobs = this.state.jobs.filter(job=>job.status != 'done');
+			this.state.tasks = this.state.tasks.filter(task=>task.status != 'done');
 		},
-		removeJob(jobToRemove) {
-			if (jobToRemove.status == 'done') {							
-				for(var i=0;i<this.state.jobs.length;i++) {
-					var job = this.state.jobs[i];
-					if (job.id === jobToRemove.id) {
-						this.state.jobs.splice(i,1);
+		removeTask(taskToRemove) {
+			if (taskToRemove.status == 'done') {							
+				for(var i=0;i<this.state.tasks.length;i++) {
+					var task = this.state.tasks[i];
+					if (task.id === taskToRemove.id) {
+						this.state.tasks.splice(i,1);
 						return;
 					}
 				}
 			} else {
 				//send kill command
-				this.$socket.emit('kill-job',jobToRemove.id);
+				this.$socket.emit('kill-task',taskToRemove.id);
 			}
 		}
 	},
@@ -69,7 +77,7 @@ export default {
 			return Math.round( value / 1024 / 1024) + "[MB]";
 		}
 	},
-	components: { Job }
+	components: { Task }
 }
 </script>
 

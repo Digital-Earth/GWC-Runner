@@ -5,7 +5,7 @@ import App from './App.vue';
 import SocketService from './SocketService';
 
 import Home from './components/Home.vue';
-import Jobs from './components/Jobs.vue';
+import Cluster from './components/Cluster.vue';
 import DataSets from './components/DataSets.vue';
 import GeoSources from './components/GeoSources.vue';
 
@@ -17,7 +17,7 @@ Vue.use(SocketService);
 
 const routes = [
 	{ path: '/', component: Home },
-	{ path: '/jobs', component: Jobs },
+	{ path: '/cluster', component: Cluster },
 	{ path: '/datasets', component: DataSets },
 	{ path: '/geosources', component: GeoSources }
 ];

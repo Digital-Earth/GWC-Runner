@@ -6,13 +6,19 @@
   "private": true,
   "scripts": {
     "dev": "cross-env node src/app.js",
+    "test": "jasmine",
     "build": "cross-env NODE_ENV=production webpack --progress --hide-modules",
     "production": "cross-env NODE_ENV=production node src/app.js"
   },
   "dependencies": {
+    "clone": "^2.1.1",
+    "event-emitter": "^0.3.5",
     "express": "^4.15.4",
+    "get-port": "^3.2.0",
     "pidusage": "^1.2.0",
     "socket.io": "^2.0.3",
+    "socket.io-client": "^2.0.4",
+    "uuid": "^3.1.0",
     "vue": "^2.3.3",
     "vue-chart": "^2.0.0",
     "vue-router": "^3.0.1",
@@ -27,6 +33,7 @@
     "file-loader": "^0.9.0",
     "friendly-errors-webpack-plugin": "^1.6.1",
     "html-webpack-plugin": "^2.30.1",
+    "jasmine": "^2.8.0",
     "node-sass": "^4.5.3",
     "sass-loader": "^6.0.6",
     "style-loader": "^0.19.1",
