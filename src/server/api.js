@@ -127,6 +127,12 @@ Api.attach = function (server, app) {
 			job.start();
 		})
 
+		socket.on('update-tags', function (url, addTags, removeTags ) {
+			let job = Api.jobs.updateTags({ url, addTags, removeTags });
+			Api.trackJob(job);
+			job.start();
+		})
+
 		socket.on('start-list', function (url) {
 			let job = Api.jobs.list({});
 			Api.trackJob(job);
@@ -232,6 +238,7 @@ Api.jobs = {
 					broken: root.BrokenDataSetCount,
 					verified: root.VerifiedDataSetCount,
 					unknown: root.UnknownDataSetCount,
+					tags: root.Metadata && root.Metadata.Tags ? root.Metadata.Tags : [],
 					lastDiscovered: new Date(root.LastDiscovered),
 					lastVerified: new Date(root.LastVerified)
 				}
@@ -258,6 +265,40 @@ Api.jobs = {
 
 		return job;
 	},
+	updateTags: function(details) {
+		let job = new Job('update')
+		let args = ['url','update'];
+
+		if (details.addTags) {
+			for(let tag of details.addTags) {
+				args.push('-add-tag='+tag);
+			}
+		}
+		if (details.removeTags) {
+			for(let tag of details.removeTags) {
+				args.push('-remove-tag='+tag);
+			}
+		}
+		args.push(details.url);
+
+		job.invoke({
+			cwd: config.cli.cwd,
+			exec: config.cli.exec,
+			args: args,
+			state: {
+				type: 'update',
+				url: details.url,
+			}
+		})
+		.then(function(taskState) {
+			if (taskState.state.root) {
+				serverContext.emit('root', taskState.state.root);
+			}
+		})
+		.complete();
+
+		return job;
+	},
 	discover: function (details) {
 		let job = new Job('discover');
 
@@ -270,7 +311,13 @@ Api.jobs = {
 				type: 'discover',
 				url: details.url
 			}
-		}).complete();
+		})
+		.then(function(taskState) {
+			if (taskState.state.root) {
+				serverContext.emit('root', taskState.state.root);
+			}
+		})
+		.complete();
 
 		return job;
 	},
@@ -290,21 +337,7 @@ Api.jobs = {
 		}, {
 				while: function (taskState) {
 					if (taskState.state.root) {
-						let root = taskState.state.root;
-						serverContext.roots.forEach((url) => {
-							if (url.url === root.Uri) {
-								url.status = root.Status;
-								url.datasets = root.DataSetCount;
-								url.working = Math.round(100 * root.VerifiedDataSetCount / root.DataSetCount);
-								url.broken = root.BrokenDataSetCount;
-								url.verified = root.VerifiedDataSetCount;
-								url.unknown = root.UnknownDataSetCount;
-								url.lastDiscovered = new Date(root.LastDiscovered);
-								url.lastVerified = new Date(root.LastVerified);
-							}
-						});
-						serverContext.emit('roots', serverContext.roots);
-
+						serverContext.emit('root', taskState.state.root);
 						return taskState.state.datasets > 0;
 					}
 					return false;
