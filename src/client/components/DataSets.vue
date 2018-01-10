@@ -33,17 +33,19 @@
                   <v-layout row wrap align-center>
                     <v-flex xs1></v-flex>
                     <v-flex xs10>
-                      <v-text-field 
-                      label="Tags"
+                      <v-select
+                        label="Tags"
                         type="string"
                         id="tags"
-                        v-model="tags">
-                      </v-text-field>
+                        chips
+                        tags
+                        v-model="selectedTags"
+                        :items="availableTags"
+                      ></v-select>
                     </v-flex>
                   </v-layout>
                 </v-expansion-panel-content>
               </v-expansion-panel>
-              
              </v-card-text>
           </v-card>
         </v-flex>
@@ -74,7 +76,9 @@
 			>
 				<template slot="items" slot-scope="props">
           <tr v-bind:class="{'green darken-1':props.item.active}">
-            <td class="text-xs-left">{{ props.item.url }}</td>
+            <td class="text-xs-left">{{ props.item.url }}
+              <v-chip color="primary" style="color:white" label small v-for="tag in props.item.tags" v-bind:key="tag">{{tag}}</v-chip>
+            </td>
             <td class="text-xs-left">{{ props.item.status }}</td>
             <td class="text-xs-left">{{ props.item.lastDiscovered | date }}</td>
             <td class="text-xs-left">{{ props.item.lastVerified | date }}</td>
@@ -88,14 +92,17 @@
                   <v-icon>more_vert</v-icon>
                 </v-btn>
                 <v-list light>
-                  <v-list-tile @click="startDiscoverJob(props.item.url)">
+                  <v-list-tile ripple @click="startDiscoverJob(props.item.url)">
                     <v-list-tile-title>Discover</v-list-tile-title>
                   </v-list-tile>
-                  <v-list-tile @click="startValidateJob(props.item.url)">
+                  <v-list-tile ripple @click="startValidateJob(props.item.url)">
                     <v-list-tile-title>Validate</v-list-tile-title>
                   </v-list-tile>
+                  <v-list-tile ripple @click="openTagsDialog(props.item)">
+                    <v-list-tile-title>Tags...</v-list-tile-title>
+                  </v-list-tile>
                 </v-list>
-                    </v-menu>
+              </v-menu>
             </td>
           </tr>
 				</template>
@@ -109,16 +116,58 @@
       <v-flex xs1></v-flex>
       <v-flex xs9>
         <v-text-field
-          name="input-1"
+          name="addNewUrl"
           label="Add New Url"
-	  			v-model="newUrl" @key-up:enter="addNewUrl()"
+	  			v-model="newUrl" @keyup.enter="addNewUrl()"
           dark>
         </v-text-field>
         </v-flex>
 		  	<v-flex xs1>
-			  	<v-btn round color="primary" dark @click="addNewUrl">Add</v-btn>
+			  	<v-btn round color="primary" dark @click="addNewUrl()">Add</v-btn>
 			  </v-flex>
 		  </v-layout>
+
+      <!-- edit tags dialog -->
+
+      <v-dialog scrollable max-width="700px" v-model="tagsDialog.active">
+        <v-card dark>
+          <v-card-title>
+            <span class="headline">Add or Remove Tags</span>
+          </v-card-title>
+          <v-divider></v-divider>
+          <v-card-text >
+            <v-container fluid>
+              <v-list scrollable>
+                <v-list-tile v-for="tag in tagsDialog.allTags" v-bind:key="tag">
+                  <v-list-tile-action>
+                    <v-checkbox v-model="tagsDialog.tags" v-bind:value="tag"></v-checkbox>
+                  </v-list-tile-action>
+                  <v-list-tile-content>
+                    <v-list-tile-title>{{ tag }}</v-list-tile-title>
+                  </v-list-tile-content>
+                </v-list-tile>
+                <v-list-tile >
+                  <v-list-tile-action>
+                    <v-checkbox></v-checkbox>
+                  </v-list-tile-action>
+                  <v-list-tile-sub-title>
+                    <v-text-field
+                      name="newTag"
+                      label="New Tag"
+                      v-model="newTag" @keyup.enter="createNewTag()"
+                    ></v-text-field>
+                  </v-list-tile-sub-title>
+                </v-list-tile>
+              </v-list>
+            </v-container>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" flat @click.native="tagsDialog.active = false">Cancel</v-btn>
+            <v-btn color="primary" @click.native="updateTags()">Apply</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
 	</div>
 </template>
@@ -132,6 +181,7 @@ export default {
     return {
       state: store.state,
       parallel: 3,
+      selectedTags: [],
       max25chars: v => v.length <= 25 || "Input too long!",
       tmp: "",
       search: "",
@@ -141,7 +191,7 @@ export default {
         descending: false
       },
       headers: [
-        { text: "Url", value: "url", align: "left" },
+        { text: "Url", value: "searchText", align: "left" },
         { text: "Status", value: "status", align: "left" },
         { text: "Last Discovered", value: "lastDiscovered", align: "left" },
         { text: "Last Verified", value: "lastVerified", align: "left" },
@@ -152,9 +202,16 @@ export default {
       ],
       items: store.state.urls,
       newUrl: "",
+      newTag: "",
       autoDiscovery: {
         active: false,
         urls: []
+      },
+      tagsDialog: {
+        root: undefined,
+        active: false,
+        allTags: [],
+        tags: []
       }
     };
   },
@@ -170,18 +227,35 @@ export default {
     },
     startAutoDiscoveryJob() {
       this.autoDiscovery.active = true;
-      this.autoDiscovery.urls = this.state.urls
+
+      let filteredUrls;
+      if (this.selectedTags.length == 0) {
+        filteredUrls = this.state.urls
         .filter(function(url) {
           let lastWeek = new Date();
           lastWeek.setDate(lastWeek.getDate() - 7);
           return new Date(url.lastVerified) < lastWeek;
         })
+      }
+      else {
+        filteredUrls = this.state.urls
+          .filter((url) => {
+            for(let tag of this.selectedTags) {
+              if (url.tags.indexOf(tag)==-1) {
+                return false;
+              }
+            }
+            return true;
+          });
+      }
+
+      this.autoDiscovery.urls = filteredUrls
         .sort(function(a, b) {
           return a.verified - b.verified;
         })
         .map(url => url.url);
 
-      this.$socket.emit("start-discover-and-validate", this.autoDiscovery.urls);
+      this.$socket.emit("start-discover-and-validate", this.autoDiscovery.urls, this.parallel);
     },
     addNewUrl() {
       if (
@@ -191,6 +265,45 @@ export default {
         this.$socket.emit("start-add-url", this.newUrl);
         this.newUrl = "";
       }
+    },
+    openTagsDialog(root) {
+      this.tagsDialog.active = true;
+      this.tagsDialog.root = root;
+      this.tagsDialog.tags = root.tags.slice();
+      this.tagsDialog.allTags = this.availableTags.slice();
+      this.newTag = "";
+    },
+    toggle(tag) {
+      this.tagsDialog.tags[tag] = !this.tagsDialog.tags[tag];
+    },
+    createNewTag() {
+      this.tagsDialog.allTags.push(this.newTag);
+      this.tagsDialog.tags.push(this.newTag);
+      this.newTag = "";
+    },
+    updateTags() {
+      let newTags = [];
+      let removedTags = [];
+
+      for(let tag of this.tagsDialog.tags) {
+        if (this.tagsDialog.root.tags.indexOf(tag) == -1) {
+          newTags.push(tag);
+        }
+      }
+
+      for(let tag of this.tagsDialog.root.tags) {
+        if (this.tagsDialog.tags.indexOf(tag) == -1) {
+          removedTags.push(tag);
+        }
+      }
+
+      console.log(newTags,removedTags);
+
+      if (newTags.length > 0 || removedTags.length > 0) {
+        this.$socket.emit("update-tags", this.tagsDialog.root.url, newTags, removedTags);
+      }
+
+      this.tagsDialog.active = false;
     }
   },
   computed: {
@@ -206,12 +319,13 @@ export default {
         working
       };
     },
-    autoDiscoveryStatus: function() {
-      if (this.autoDiscovery.active) {
-        return "Running";
-      } else {
-        return "";
-      }
+    availableTags: function() {
+      let tags = new Set();
+      this.state.urls.forEach(url => {
+        url.tags.forEach(tag => tags.add(tag));
+      });
+
+      return [...tags];
     }
   },
   mounted() {

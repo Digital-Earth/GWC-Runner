@@ -96,7 +96,7 @@ class Action {
 
 		function startNextTask() {
 			action.running = true;
-			while (action.tasks.length < parallel && items.length > 0) {
+			while (action.tasks.length < parallel && index < items.length) {
 				let itemIndex = index;
 				index++;
 
