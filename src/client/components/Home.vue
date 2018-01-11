@@ -64,7 +64,7 @@
                             <div class="headline text-xs-center">Roots</div>
                         </v-card-title>
                         <v-card-text class="px-0">
-                            <div class="display-4">{{roots.roots}}</div>
+                            <div class="display-4">{{roots.roots | number}}</div>
                             <div class="graph">
                                 <vue-chart type="horizontalBar" :data="rootsData" :options="chartOptions"></vue-chart>
                             </div>

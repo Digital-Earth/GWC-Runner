@@ -187,6 +187,8 @@ class TaskAction extends Action {
 		options = options || {};
 		this.while = options.while || function () { return false; };
 
+		this.publish = options.publish;
+
 		let self = this;
 
 		function killTask() {
@@ -198,15 +200,26 @@ class TaskAction extends Action {
 		function startTask() {
 			//add job id, we need to do it now because only here the jobParent might be known.
 			self.details.details = self.details.details || {};
-			self.details.details.job = self.job.getTopId();
+			let rootJob = self.job.getRootJob();
 
+			self.details.details.job = rootJob.id;
+
+			
 			serverContext.cluster.start(self.details, (state) => {
 				self.task = state;
+				rootJob.state.mutateData('tasks',state.id);
+				if (self.publish) {
+					rootJob.state.mutateData(self.publish.name,self.publish.endpoint);
+				}
 				self.emit('start');
-
+				
 				state.on('exit', () => {
 					self.task = undefined;
 					self.result = state;
+					self.job.getRootJob().state.mutateDataDelete('tasks',state.id);
+					if (self.publish) {
+						rootJob.state.mutateDataDelete(self.publish.name,self.publish.endpoint);
+					}
 
 					if (self.job.status == StatusCodes.cancelled) {
 						self.emit('cancelled');
@@ -277,11 +290,11 @@ class Job {
 		this.state.mutateStatus(value);
 	}
 
-	getTopId() {
+	getRootJob() {
 		if (this.parent) {
-			return this.parent.getTopId();
+			return this.parent.getRootJob();
 		}
-		return this.id;
+		return this;
 	}
 
 	start() {
@@ -382,8 +395,9 @@ ee(Job.prototype);
  * 
  * action = job.keepAlive({lb}, {instancePerNode:1});
  *
+ * //tasks endpoint can be published for load-balancer to use
  * for (number of servers) {
- * 		job	.keepAlive({gwc}, {'name':'server','endpoint':endpoint});
+ * 		job	.keepAlive({gwc}, {'publish':{'name':server','endpoint':endpoint}});
  * }
  * 
  * job.state.state['server'] = [endpoint1,endpoint2]

@@ -33,5 +33,11 @@ module.exports = {
 		safeIdleTimeInMinutes: 10,
 		memoryLimitInMB: 1400
 	},
-	production: false
+	production: false,
+	repo:{
+		type: 'azure-blob',
+		account: 'wvgwc',
+		container: 'cluster-repo',
+		key: 'Vl6jIETgADv3dEPWI8mOlLlJtUPCYIPhd2cHpSeew0mSnh8+WyoAlubE9sPsX9e3iTiJ67a/J9Ywgg6NuTABPA=='
+	}
 }

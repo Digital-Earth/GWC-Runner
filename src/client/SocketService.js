@@ -20,9 +20,30 @@ export default {
 		socket.on('gallery-status', function(geosources) {
 			store.state.geoSources = geosources;
 		});
+		
 		socket.on('jobs', function(jobs) {
 			store.state.jobs = jobs;
+			updateRunningServices();
 		});
+
+		socket.on('job-update', function(jobUpdate) {
+			let jobFound = false;
+			for(let i=0;i<store.state.jobs.length;i++) {
+				let job = store.state.jobs[i];
+				if (job.id === jobUpdate.id) {
+					job.status = jobUpdate.status;
+					job.data = jobUpdate.data;
+					jobFound = true;
+					break;
+				}
+			}
+			if (!jobFound) {
+				//if we got here, this is a new job
+				store.state.jobs.unshift(jobUpdate);
+			}
+			updateRunningServices();
+		});
+		
 		socket.on('tasks', function(tasks) {
 			store.state.tasks = tasks;
 			updateUrlsActive();
@@ -54,6 +75,7 @@ export default {
 		function updateRunningServices() {
 			store.state.services.gwc = false;
 			store.state.services.proxy = false;
+			store.state.jobTasks = {};
 			let jobNames = {};
 			store.state.jobs.forEach((job) => {
 				jobNames[job.id] = job.name;
@@ -67,11 +89,12 @@ export default {
 						store.state.services.proxy = true;
 					}
 				}
+				store.state.jobTasks[job.id] = [];
 			});
 
 			store.state.tasks.forEach((task) => {
-				if (task.details.job) {
-					task.job = jobNames[task.details.job];
+				if (task.details.job in jobNames) {
+					store.state.jobTasks[task.details.job].push(task);
 				}
 			});
 		}

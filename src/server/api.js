@@ -1,6 +1,7 @@
 let serverContext = require('./ServerContext');
 var Job = require('./Job');
 var config = require('./config');
+var debounce = require('debounce');
 
 const { ClusterTaskManager, LocalTaskManager } = require('./TaskManager');
 
@@ -33,6 +34,17 @@ Api.attach = function (server, app) {
 		}
 	}
 
+	function transformJob(job) {
+		return {
+			id: job.id,
+			name: job.name,
+			status: job.state.status,
+			state: job.state.state,
+			data: job.state.data,
+			details: job.state.details
+		}
+	}
+
 	function sendInitialUpdate() {
 		io.emit('tasks', serverContext.cluster.tasks().map(transformTask));
 		io.emit('roots', serverContext.roots || []);
@@ -58,34 +70,35 @@ Api.attach = function (server, app) {
 	}
 
 	function sendJobs() {
-		io.emit('jobs', serverContext.jobs.map((job) => {
-			return {
-				id: job.id,
-				name: job.name,
-				status: job.state.status,
-				state: job.state.state,
-				data: job.state.data,
-				details: job.state.details
-			}
-		}));
+		io.emit('jobs', serverContext.jobs.map(transformJob));
 	}
+
+	function sendJobUpdate(job) {
+		io.emit('job-update', transformJob(job));
+	}
+
+	serverContext.on('job',(job) => sendJobUpdate(job));
 
 	serverContext.jobs = [];
 
 	Api.trackJob = function (job) {
 		job.on('start', function () {
 			serverContext.jobs.push(job);
-			sendJobs();
+			serverContext.emit('job',job);
+		});
+
+		job.state.on('mutate', function () {
+			serverContext.emit('job',job);
 		});
 
 		job.on('done', function () {
 			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
-			sendJobs();
+			serverContext.emit('job',job);
 		});
 
 		job.on('cancelled', function () {
 			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
-			sendJobs();
+			serverContext.emit('job',job);
 		});
 	}
 
@@ -130,7 +143,7 @@ Api.attach = function (server, app) {
 			job.start();
 		})
 
-		socket.on('update-tags', function (url, addTags, removeTags ) {
+		socket.on('update-tags', function (url, addTags, removeTags) {
 			let job = Api.jobs.updateTags({ url, addTags, removeTags });
 			Api.trackJob(job);
 			job.start();
@@ -181,20 +194,82 @@ Api.attach = function (server, app) {
 		/* END - ALL LEGACY STUFF */
 	});
 
-	//rest API ?
+	//job track api
+
+	let jobSocket = io.of('/job');
+
+	let jobTrackClients = [];
+
+	jobSocket.on('connection', function(socket) {
+		let trackList = [];
+
+		let emit = debounce(function(job) {
+			client.socket.emit('job-update',transformJob(job));
+		},100);
+
+		let client = {
+			socket,
+			emit,
+			isTracking(job) {
+				return trackList.indexOf(job.id) !== -1 || trackList.indexOf(job.name) !== -1;
+			}
+		};
+
+		socket.on('start-tracking',function(id) {
+			let index = trackList.indexOf(id);
+			if (index == -1) {
+				trackList.push(id);
+
+				//send current state if we are tracking this job
+				for(let job of serverContext.jobs) {
+					if (job.id == id || job.name == id) {
+						client.emit(job);
+					}
+				}
+			};
+		});
+		socket.on('stop-tracking', function(id) {
+			let index = trackList.indexOf(id);
+			if (index != -1) {
+				trackList.splice(index,1);
+			}
+		});
+
+		socket.on('disconnect', function() {
+			jobTrackClients.splice(jobTrackClients.indexOf(client),1);
+		});
+
+		jobTrackClients.push(client);
+	});
+
+	serverContext.on('job', function(job) {
+		for(let client of jobTrackClients) {
+			if (client.isTracking(job)) {
+				client.emit(job);
+			}
+		}
+	});
+
+	//rest API
 	app.get('/nodes', function (req, res) {
 		res.send(JSON.stringify(serverContext.cluster.nodes()));
 		res.end();
 	});
 
+	app.get('/jobs/:id', function (req, res) {
+		let job = serverContext.jobs.filter(job => job.id == req.params.id || job.name == req.params.id)[0];
+		if (job) {
+			res.send(JSON.stringify(transformJob(job)));
+			res.end();
+		} else {
+			res.status(404);
+			res.send('Job ' + req.params.id + ' not found');
+			res.end();
+		}
+	});
+
 	app.get('/jobs', function (req, res) {
-		res.send(JSON.stringify(serverContext.jobs.map((job) => {
-			return {
-				id: job.id,
-				name: job.name,
-				status: job.status,
-			}
-		})));
+		res.send(JSON.stringify(serverContext.jobs.map(transformJob)));
 		res.end();
 	});
 }
@@ -268,18 +343,18 @@ Api.jobs = {
 
 		return job;
 	},
-	updateTags: function(details) {
+	updateTags: function (details) {
 		let job = new Job('update')
-		let args = ['url','update'];
+		let args = ['url', 'update'];
 
 		if (details.addTags) {
-			for(let tag of details.addTags) {
-				args.push('-add-tag='+tag);
+			for (let tag of details.addTags) {
+				args.push('-add-tag=' + tag);
 			}
 		}
 		if (details.removeTags) {
-			for(let tag of details.removeTags) {
-				args.push('-remove-tag='+tag);
+			for (let tag of details.removeTags) {
+				args.push('-remove-tag=' + tag);
 			}
 		}
 		args.push(details.url);
@@ -293,12 +368,12 @@ Api.jobs = {
 				url: details.url,
 			}
 		})
-		.then(function(taskState) {
-			if (taskState.state.root) {
-				serverContext.emit('root', taskState.state.root);
-			}
-		})
-		.complete();
+			.then(function (taskState) {
+				if (taskState.state.root) {
+					serverContext.emit('root', taskState.state.root);
+				}
+			})
+			.complete();
 
 		return job;
 	},
@@ -315,12 +390,12 @@ Api.jobs = {
 				url: details.url
 			}
 		})
-		.then(function(taskState) {
-			if (taskState.state.root) {
-				serverContext.emit('root', taskState.state.root);
-			}
-		})
-		.complete();
+			.then(function (taskState) {
+				if (taskState.state.root) {
+					serverContext.emit('root', taskState.state.root);
+				}
+			})
+			.complete();
 
 		return job;
 	},
@@ -412,7 +487,13 @@ Api.jobs = {
 
 		['master', 'server', 'import'].forEach(function (type) {
 			config.gwc[type + 'Ports'].forEach(function (port, index) {
-				job.keepAlive(createGwcDetails(type, index));
+				let details = createGwcDetails(type, index);
+				job.keepAlive(details, {
+					publish: {
+						name: type,
+						endpoint: details.state.url
+					}
+				});
 			})
 		});
 

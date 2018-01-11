@@ -1,18 +1,25 @@
 <template>
 	<div>
-		<h2 class="space">Jobs</h2>
+		<h2 class="space">
+			Jobs
+			<v-btn round color="primary" dark style="float:right;margin-right:10px" @click="clearAllDone()">Clear All Done</v-btn>
+		</h2>
 
-		<div class="task" v-for="job in state.jobs" v-bind:key="job.id">
-			<div class="header" v-bind:class="{ running: job.status == 'running'}">
+		<div class="job-info" v-for="job in state.jobs" v-bind:key="job.id">
+			<div class="job-header" v-bind:class="{ running: job.status == 'running'}">
 				{{job.name}} - {{job.id}}
+			</div>
+
+			<div class="inside">
+				<task class="task" v-for="task in state.jobTasks[job.id]" v-bind:key="task.id" v-bind:task="task" v-on:close="removeTask(task)"></task>
 			</div>
 		</div>
 
 		<h2 class="space">Tasks
-			<v-btn round color="primary" dark style="float:right;margin-right:10px" @click="clearAllDone()">Clear All Done</v-btn>
+			
 		</h2>
 
-		<task class="task" v-for="task in state.tasks" v-bind:key="task.id" v-bind:task="task" v-on:close="removeTask(task)"></task>
+		
 	</div>
 </template>
 
@@ -55,7 +62,7 @@ export default {
 			this.tasks.unshift(taskUpdate);
 		},
 		clearAllDone() {
-			this.state.tasks = this.state.tasks.filter(task=>task.status != 'done');
+			store.clearAllDone();
 		},
 		removeTask(taskToRemove) {
 			if (taskToRemove.status == 'done') {							
@@ -88,61 +95,23 @@ export default {
 	margin-bottom: 20px;
 }
 
-.url-info {
+.job-info {
 	border: 1px solid #888;
 	margin: 10px;
 	position: relative;
 }
 
-.url-info .section {
+.job-info .job-header {
 	display: inline-block;
 	position: relative;
 	overflow: hidden;
 	padding: 10px;
-}
-
-.url-info .section.small {
-	width: 200px;
-	border-right: 1px solid #aaa;
-}
-
-.url-info .actions {
-	position: absolute;
-	right: 10px;
-	top: 10px;
-}
-
-.url-info .background-container {
-	position: absolute;
 	width: 100%;
-	height: 100%;
+	border-bottom: 1px solid #888;
 }
 
-.url-info .background {
-	position: absolute;
-	top: 0;
-	height: 100%;
-}
-
-.url-info .background.green {
-	left: 0;
-	background-color: #afa;
-}
-
-.url-info .background.red {
-	right: 0;
-	background-color: #faa;
-}
-
-.url-info .details {
-	position: relative;
-	left: 0;
-	top: 0;
-	width: 100%;
-	text-align: left;
-}
-.url-info.error {
-	background-color: #faa;
+.job-info .job-header.running {
+	background-color: #32a323;
 }
 
 </style>
