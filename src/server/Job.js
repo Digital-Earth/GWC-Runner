@@ -1,16 +1,9 @@
 const clone = require('clone');
 const uuid = require('uuid/v4');
 const ee = require('event-emitter');
+const { StatusCodes , MutableState } = require('./MutableState');
 
 let serverContext = require('./ServerContext');
-
-JobStatus = {
-	new: 'new',
-	running: 'running',
-	stopped: 'stopped',
-	done: 'done',
-	cancelled: 'cancelled'
-}
 
 class SyncPoint {
 	constructor() {
@@ -96,7 +89,7 @@ class Action {
 
 		function startNextTask() {
 			action.running = true;
-			while (action.tasks.length < parallel && items.length > 0) {
+			while (action.tasks.length < parallel && index < items.length) {
 				let itemIndex = index;
 				index++;
 
@@ -215,7 +208,7 @@ class TaskAction extends Action {
 					self.task = undefined;
 					self.result = state;
 
-					if (self.job.status == JobStatus.cancelled) {
+					if (self.job.status == StatusCodes.cancelled) {
 						self.emit('cancelled');
 						self.running = false;
 						self.sync.trigger(self.result);
@@ -232,14 +225,14 @@ class TaskAction extends Action {
 					}
 				});
 
-				if (self.job.status != JobStatus.running) {
+				if (self.job.status != StatusCodes.running) {
 					killTask();
 				}
 			});
 		}
 
 		this.trigger.on(() => {
-			if (self.job.status == JobStatus.cancelled) {
+			if (self.job.status == StatusCodes.cancelled) {
 				self.emit('cancelled');
 				self.sync.trigger();
 				return;
@@ -260,15 +253,28 @@ class TaskAction extends Action {
 class Job {
 	constructor(name) {
 		this.parent = null;
-		this.name = name;
 		this.id = uuid();
-		this.status = JobStatus.new;
-
+		this.name = name || this.id;
+		
+		this.state = new MutableState({
+			id: this.id,
+			name: this.name,
+			status: StatusCodes.new
+		});
+		
 		//start point
 		this.root = new Action(this, null);
 
 		//complete point
 		this.sync = new SyncPoint();
+	}
+
+	get status() {
+		return this.state.status;
+	}
+
+	set status(value) {
+		this.state.mutateStatus(value);
 	}
 
 	getTopId() {
@@ -279,25 +285,25 @@ class Job {
 	}
 
 	start() {
-		if (this.status == JobStatus.new || this.status == JobStatus.stopped) {
-			this.status = JobStatus.running;
+		if (this.status == StatusCodes.new || this.status == StatusCodes.stopped) {
+			this.status = StatusCodes.running;
 			this.emit('start');
 			this.root.sync.trigger();
 		}
 	}
 
 	kill() {
-		if (this.status == JobStatus.new || this.status == JobStatus.running || this.status.JobStatus.stopped) {
-			this.status = JobStatus.cancelled;
+		if (this.status == StatusCodes.new || this.status == StatusCodes.running || this.status.StatusCodes.stopped) {
+			this.status = StatusCodes.cancelled;
 			this.emit('cancelled');
 			this.root.sync.trigger();
 		}
 	}
 
 	complete(value) {
-		if (this.status == JobStatus.new || this.status == JobStatus.running) {
+		if (this.status == StatusCodes.new || this.status == StatusCodes.running) {
 			this.result = value;
-			this.status = JobStatus.done;
+			this.status = StatusCodes.done;
 			this.sync.trigger(value);
 			this.emit('done');
 		}
@@ -376,6 +382,11 @@ ee(Job.prototype);
  * 
  * action = job.keepAlive({lb}, {instancePerNode:1});
  *
+ * for (number of servers) {
+ * 		job	.keepAlive({gwc}, {'name':'server','endpoint':endpoint});
+ * }
+ * 
+ * job.state.state['server'] = [endpoint1,endpoint2]
  * 
  * options:
  *    instances: number

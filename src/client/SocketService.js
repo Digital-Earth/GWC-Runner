@@ -13,6 +13,7 @@ export default {
 		})
 		socket.on('roots', function(urls) {
 			store.state.urls = urls;
+			makeTagsSearchable();
 			updateUrlsActive();
             store.emit('urls',urls);
 		});
@@ -74,6 +75,13 @@ export default {
 				}
 			});
 		}
+
+		function makeTagsSearchable() {
+			for(let url of store.state.urls) {
+				url.searchText = url.url + " " + url.tags.join(' ');
+			}
+		}
+
 		function updateUrlsActive () {
 			let activeUrls = {};
 			store.state.tasks.forEach((task) => {

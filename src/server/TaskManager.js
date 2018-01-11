@@ -1,6 +1,6 @@
 const uuid = require('uuid/v4');
 const clone = require('clone');
-var { TaskState } = require('./TaskState');
+var { MutableState } = require('./MutableState');
 var Task = require('./Task');
 
 const ee = require('event-emitter');
@@ -15,9 +15,9 @@ const ee = require('event-emitter');
  * 		killTaskById(id) -> kill a task by a given id
  * 		
  * events:
- * 		new-task , TaskState
- * 		task-end , TaskState
- * 		mutate	 , TaskState
+ * 		new-task , MutableState
+ * 		task-end , MutableState
+ * 		mutate	 , MutableState
  * 
  */
 
@@ -163,7 +163,7 @@ class RemoteTaskManager {
 			});
 
 			this.node.on('task', function (task) {
-				let state = new TaskState(task);
+				let state = new MutableState(task);
 				state.node = self.id;
 
 				self._tasksLookup[state.id] = state;
@@ -198,7 +198,7 @@ class RemoteTaskManager {
 
 			this.node.on('tasks', function (tasks) {
 				self._tasks = tasks.map(task => {
-					let state = new TaskState(task);
+					let state = new MutableState(task);
 					state.node = self.id;
 					return state;
 				});

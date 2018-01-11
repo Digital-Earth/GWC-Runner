@@ -2,14 +2,14 @@
 const serverContext = require('../../src/server/ServerContext');
 const Job = require('../../src/server/Job');
 const ee = require('event-emitter');
-const { TaskState } = require('../../src/server/TaskState');
+const { MutableState } = require('../../src/server/MutableState');
 
 serverContext.cluster = {
 	_tasks: {},
 	autoStart: false,
 
 	start: function (details, callback) {
-		let state = new TaskState(details);
+		let state = new MutableState(details);
 		state.on('start', callback)
 
 		this._tasks[state.id] = state;
