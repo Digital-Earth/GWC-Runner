@@ -400,6 +400,7 @@ ee(Job.prototype);
  * 		job	.keepAlive({gwc}, {'publish':{'name':server','endpoint':endpoint}});
  * }
  * 
+ * //this wil lcause job start to publish all tasks endpoints
  * job.state.state['server'] = [endpoint1,endpoint2]
  * 
  * options:
