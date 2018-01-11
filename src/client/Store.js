@@ -2,29 +2,33 @@ import Vue from 'vue';
 
 let vm = new Vue();
 
-export default {
-    state: {
-        connected: false,
-        services: {
-            gwc:false,
-            proxy: false 
-        },
-        urls: [],
-        geoSources: [],
-        nodes: [],
-        jobs: [],
-        tasks: [],
-        pages: {
-            datasets: {
-                pagination: {
-                    sortBy: "verified",
-                    rowsPerPage: 10,
-                    descending: false
-                },
-                search: ""
-            }
-        }
+let state = {
+    connected: false,
+    services: {
+        gwc:false,
+        proxy: false 
     },
+    urls: [],
+    geoSources: [],
+    nodes: [],
+    jobs: [],
+    jobTasks: {},
+    tasks: [],
+    pages: {
+        datasets: {
+            pagination: {
+                sortBy: "verified",
+                rowsPerPage: 10,
+                descending: false
+            },
+            search: ""
+        }
+    }
+};
+
+export default {
+    state,
+
     // aggregate a list by fields:
     // usage: store.aggregate(store.state.urls,'verified','unknown','broken') -> { verified: 1212, ... }
     aggregate: function(list) {
@@ -45,5 +49,15 @@ export default {
     },
     emit(event,args) {
         vm.$emit(event,args);
+    },
+    clearAllDone() {
+        state.tasks = state.tasks.filter((task)=>task.status != 'done');
+        state.jobs = state.jobs.filter((job)=>job.status != 'done' && job.status != 'cancelled');
+        for(let job of state.jobs) {
+            let tasks = state.jobTasks[job.id];
+            if (tasks) {
+                state.jobTasks[job.id] = tasks.filter((task)=>task.status != 'done');
+            }
+        }
     }
 }
