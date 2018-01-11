@@ -37,7 +37,7 @@
                       label="Tags"
                         type="string"
                         id="tags"
-                        v-model="tags">
+                        >
                       </v-text-field>
                     </v-flex>
                   </v-layout>
@@ -134,12 +134,8 @@ export default {
       parallel: 3,
       max25chars: v => v.length <= 25 || "Input too long!",
       tmp: "",
-      search: "",
-      pagination: {
-        sortBy: "verified",
-        rowsPerPage: 10,
-        descending: false
-      },
+      search: store.state.pages.datasets.search,
+      pagination: store.state.pages.datasets.pagination,
       headers: [
         { text: "Url", value: "url", align: "left" },
         { text: "Status", value: "status", align: "left" },
@@ -219,6 +215,11 @@ export default {
     store.on("urls", () => {
       self.items = store.state.urls;
     });
+  },
+  destroyed() {
+    //save pagination and search status
+    store.state.pages.datasets.search = this.search;
+    store.state.pages.datasets.pagination = this.pagination;
   },
   filters: {
     mb(value) {

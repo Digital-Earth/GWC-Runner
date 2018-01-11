@@ -14,6 +14,16 @@ export default {
         nodes: [],
         jobs: [],
         tasks: [],
+        pages: {
+            datasets: {
+                pagination: {
+                    sortBy: "verified",
+                    rowsPerPage: 10,
+                    descending: false
+                },
+                search: ""
+            }
+        }
     },
     // aggregate a list by fields:
     // usage: store.aggregate(store.state.urls,'verified','unknown','broken') -> { verified: 1212, ... }
