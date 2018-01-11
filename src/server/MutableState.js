@@ -7,10 +7,11 @@ const StatusCodes = {
 	'running': 'running',
 	'terminating': 'terminating',
 	'done': 'done',
-	'error': 'error'
+	'error': 'error',
+	'cancelled': 'cancelled'
 };
 
-class TaskState
+class MutableState
 {
 	constructor(state) {
 		state = state || {};
@@ -50,6 +51,10 @@ class TaskState
 
 			case 'data':
 				this.mutateData(update.key,update.value);
+				break;
+
+			case 'data-delete':
+				this.mutateDataDelete(update.key,update.value);
 				break;
 
 			case 'log':
@@ -112,6 +117,20 @@ class TaskState
 		});
 	}
 
+	mutateDataDelete(key,value) {
+		this.data = this.data || {};
+		this.data[key] = this.data[key] || [];
+		let index = this.data[key].indexOf(value);
+		if (index !== -1) {
+			this.data[key].splice(index,1);
+			this.emit('mutate', {
+				type:'data-delete',
+				key: key,
+				value: value
+			});
+		}
+	}
+
 	mutateLog(value) {
 		this.log.push(value);
 		if (this.log.length > 10) {
@@ -124,9 +143,9 @@ class TaskState
 	}
 }
 
-ee(TaskState.prototype);
+ee(MutableState.prototype);
 
 module.exports = {
-	TaskState,
+	MutableState,
 	StatusCodes
 }

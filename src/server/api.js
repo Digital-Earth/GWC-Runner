@@ -62,7 +62,10 @@ Api.attach = function (server, app) {
 			return {
 				id: job.id,
 				name: job.name,
-				status: job.status,
+				status: job.state.status,
+				state: job.state.state,
+				data: job.state.data,
+				details: job.state.details
 			}
 		}));
 	}

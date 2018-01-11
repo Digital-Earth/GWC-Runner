@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const getPort = require('get-port');
 const io = require('socket.io-client');
-const { TaskState } = require('./server/TaskState');
+const { MutableState } = require('./server/MutableState');
 const Task = require('./server/Task');
 const {LocalTaskManager} = require('./server/TaskManager');
 

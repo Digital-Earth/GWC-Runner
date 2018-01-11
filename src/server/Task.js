@@ -4,7 +4,7 @@ const fs = require('fs');
 const EventEmitter = require('events');
 const processUsage = require('pidusage');
 const TaskLogParser = require('./TaskLogParser');
-const { TaskState, StatusCodes } = require('./TaskState');
+const { MutableState, StatusCodes } = require('./MutableState');
 
 class Task {
 	constructor(options) {
@@ -40,7 +40,7 @@ class Task {
 
 		options = extend({}, defaults, options);
 
-		this.state = new TaskState({
+		this.state = new MutableState({
 			id: options.id,
 			name: options.name,
 			status: StatusCodes.new,
