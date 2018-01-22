@@ -11,14 +11,17 @@ const ee = require('event-emitter');
  * methods:
  * 		start(details,callback) -> start new task
  * 		tasks() -> return list of tasks states
+ * 		nodes() -> return list of nodes with ids
  * 		hasTaskWithId(id) -> return true is task exists
  * 		killTaskById(id) -> kill a task by a given id
  * 		
  * events:
  * 		new-task , MutableState
  * 		task-end , MutableState
- * 		mutate	 , MutableState
+ * 		mutate	 , MutableState, UpdateInfo
  * 
+ *      node-connected, Node
+ *      node-disconnected, Node
  */
 
 class LocalTaskManager {
@@ -26,6 +29,7 @@ class LocalTaskManager {
 		this.streamEvent = false;
 		this.master = undefined;
 		this._tasks = [];
+		this.id = uuid();
 
 		this.attachMaster(master);
 	}
@@ -38,10 +42,15 @@ class LocalTaskManager {
 
 			this.master.on('connect', function () {
 				self.streamEvent = true;
-				self.master.emit('tasks', self.tasks());
+				self.master.emit('setup', {
+					nodes: [{
+						id: self.id,
+					}],
+					tasks: self.tasks(),
+				});
 			});
 
-			this.master.on('new-task', function(details) {
+			this.master.on('start-task', function(details) {
 				self.start(details);
 			});
 
@@ -63,17 +72,18 @@ class LocalTaskManager {
 		let self = this;
 
 		if (self.streamEvent) {
-			self.master.emit('task', task.state);
+			self.master.emit('new-task', task.state);
 		}
 
 		task.state.on('mutate', function (update) {
-			if (self.streamEvent) {
-				let updateWithId = clone(update);
-				updateWithId.id = task.state.id;
+			let updateWithId = clone(update);
+			updateWithId.id = task.state.id;
+
+			if (self.streamEvent) {	
 				self.master.emit('mutate', updateWithId);
 			}
 
-			self.emit('mutate',task.state);
+			self.emit('mutate', task.state, updateWithId);
 		});
 
 		task.state.on('start', function() {
@@ -96,6 +106,13 @@ class LocalTaskManager {
 
 	start(details, callback) {
 		let task = new Task(details);
+
+		//overwrite node and app details
+		task.state.details.node = this.id;
+		if (details.app) {
+			task.state.details.app = task.state.details.app || details.app;
+		}
+
 		if (callback) {
 			task.state.on('start',() => callback(task.state) );
 		}
@@ -137,15 +154,18 @@ class LocalTaskManager {
 	tasks() {
 		return this._tasks.map(task => task.state);
 	}
-	
+
+	nodes() {
+		return [{id:this.id}]
+	}	
 }
 
 class RemoteTaskManager {
 	constructor(node) {
 		this.connected = true;
 		this.node = node;
-		this.id = node.id.replace('/node#','').substr(0,5);
 		this._tasks = [];
+		this._nodes = [];
 		this.completedTasks = [];
 		this._tasksLookup = {};
 
@@ -162,10 +182,17 @@ class RemoteTaskManager {
 				self.connected = false;
 			});
 
-			this.node.on('task', function (task) {
-				let state = new MutableState(task);
-				state.node = self.id;
+			this.node.on('setup', function(details) {
+				self._tasks = details.tasks.map(task=>new MutableState(task));
+				self._tasksLookup = {};
+				self._tasks.forEach(task => { self._tasksLookup[task.id] = task });
+				self._nodes = details.nodes;
 
+				self.emit('ready');
+			});
+
+			this.node.on('new-task', function (task) {
+				let state = new MutableState(task);
 				self._tasksLookup[state.id] = state;
 				self._tasks.push(state);
 
@@ -196,22 +223,26 @@ class RemoteTaskManager {
 				}
 			});
 
-			this.node.on('tasks', function (tasks) {
-				self._tasks = tasks.map(task => {
-					let state = new MutableState(task);
-					state.node = self.id;
-					return state;
-				});
-				self._tasksLookup = {};
-				self._tasks.forEach(task => { self._tasksLookup[task.id] = task });
-			});
-
 			this.node.on('mutate', function (update) {
 				if (update.id in self._tasksLookup) {
 
 					let state = self._tasksLookup[update.id];
 					state.mutate(update);
-					self.emit('mutate', state);
+					self.emit('mutate', state, update);
+				}
+			});
+			
+			this.node.on('node-connected', function(node) {
+				self._nodes.push(node);
+				self.emit('node-connected',node);
+			});
+
+			this.node.on('node-disconnected', function(node) {
+				for(let i = 0;i<self._nodes.length;i++) {
+					let existingNode = self._nodes[i];
+					if (existingNode.id == node.id) {
+						self._nodes.splice(i,1);
+					}
 				}
 			});
 		}
@@ -226,7 +257,7 @@ class RemoteTaskManager {
 		if (callback) {
 			this._startRequests[details.id] = callback;
 		}
-		this.node.emit('new-task', details);
+		this.node.emit('start-task', details);
 	}
 
 	hasTaskWithId(id) {
@@ -244,25 +275,26 @@ class RemoteTaskManager {
 	tasks() {
 		return this._tasks;
 	}
+
+	nodes() {
+		return this._nodes;
+	}
 }
 
 class ClusterTaskManager {
 	constructor(socket) {
 		this.socket = socket;
 		this._nodes = [];
+		this.id = uuid();
 		this.nextNode = 0;
 		let self = this;
 
 		this.socket.on('connection', (nodeSocket) => {
-			let node = self.addNode(nodeSocket.id, new RemoteTaskManager(nodeSocket));
-
-			self.emit('new-node');
+			let node = self.addNode(nodeSocket.id || uuid(), new RemoteTaskManager(nodeSocket));
 
 			//remove if needed.
 			nodeSocket.on('disconnect', function () {
 				node.detach();
-
-				self.emit('node-detach');
 			});
 		});
 	}
@@ -277,18 +309,34 @@ class ClusterTaskManager {
 		//aggregate all events
 		node.manager.on('new-task', (task) => self.emit('new-task', task));
 		node.manager.on('task-end', (task) => self.emit('task-end', task));
-		node.manager.on('mutate', (task) => self.emit('mutate', task));
+		node.manager.on('mutate', (task, update) => self.emit('mutate', task, update));
+		node.manager.on('node-connected', (node) => self.emit('node-connected', node));
+		node.manager.on('node-disconnected', (node) => self.emit('node-disconnected', node));
 
 		//add detach method for future use
 		node.detach = function() {
 			self._nodes.splice(self._nodes.indexOf(node), 1);
 
-			self.emit('node-disconnected', node);
+			for(let nodeDetails of node.manager.nodes()) {
+				self.emit('node-disconnected', nodeDetails);
+			}
 		}
 
 		//push it to the nodes list.
 		this._nodes.push(node);
-		this.emit('node-connected', node);
+
+		//notify when nodes are connected
+		if (node.manager.nodes().length > 0) {
+			for(let nodeDetails of node.manager.nodes()) {
+				self.emit('node-connected', nodeDetails);
+			}
+		} else {
+			node.manager.on('ready', function() {
+				for(let nodeDetails of node.manager.nodes()) {
+					self.emit('node-connected', nodeDetails);
+				}	
+			});
+		}
 
 		return node;
 	}
@@ -324,6 +372,10 @@ class ClusterTaskManager {
 	}
 
 	nodes() {
+		return this._nodes.reduce(function (result, node) {
+			return result.concat(node.manager.nodes())
+		}, []);
+		/*
 		return this._nodes.map(function(node) {
 			let tasks = node.manager.tasks();
 
@@ -333,6 +385,59 @@ class ClusterTaskManager {
 				memory: tasks.reduce((total,task) => total + task.usage.memory , 0),
 				cpu: tasks.reduce((total,task) => total + task.usage.cpu , 0)
 			}
+		});
+		*/
+	}
+
+	expose(io) {
+		let self = this;
+		io.on('connect',function(socket) {
+			let appDetails = {};
+
+			socket.emit('setup', {
+				tasks: self.tasks(),
+				nodes: self.nodes()
+			});
+			
+			socket.on('setup', function(app) {
+				appDetails.id = app.id;
+			})
+
+			socket.on('start-task', function(details) {
+				//overwrite app id.
+				if (appDetails.id) {
+					details.app = appDetails.id;
+				}
+				
+				self.start(details);
+			});
+
+			socket.on('kill-task', function(id) {
+				self.killTaskById(id);
+			});
+
+			socket.on('disconnect', function () {
+			});
+		});
+
+		self.on('new-task', function(task) {
+			io.emit('new-task',task);
+		});
+
+		self.on('task-end', function(task) {
+			io.emit('task-end',task);
+		});
+
+		self.on('mutate', function(task, update) {
+			io.emit('mutate', update);
+		});
+
+		self.on('node-connected', function(node) {
+			io.emit('node-connected',node);
+		});
+
+		self.on('node-disconnected', function(node) {
+			io.emit('node-disconnected',node);
 		});
 	}
 }

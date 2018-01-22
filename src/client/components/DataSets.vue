@@ -7,7 +7,7 @@
         <v-flex xs4>
           <v-card dark color="secondary" hover height="100%">
             <v-card-title primary-title >
-                <div class="headline text-xs-center">Discover</div>
+                <div class="headline text-xs-center">Discover {{selectedItemsCount}}</div>
                 <v-spacer></v-spacer>
                 <v-btn round color="primary" dark @click="startAutoDiscoveryJob()" v-bind:disabled="autoDiscovery.active" ><v-icon>play_arrow</v-icon></v-btn>
             </v-card-title>
@@ -64,6 +64,7 @@
 				label="Search Url"
 				single-line
 				hide-details
+
 				v-model="search"
 			></v-text-field>
 			</v-card-title>
@@ -71,11 +72,20 @@
 				v-bind:headers="headers"
 				v-bind:items="items"
         item-key="url"
+        select-all="true"
 				v-bind:search="search"
 				v-bind:pagination.sync="pagination"
+        v-model="selectedItems"
 			>
 				<template slot="items" slot-scope="props">
           <tr v-bind:class="{'green darken-1':props.item.active}">
+            <td :active="props.selected" @click="props.selected = !props.selected">
+              <v-checkbox
+                primary
+                hide-details
+                :input-value="props.selected"
+              ></v-checkbox>
+            </td>
             <td class="text-xs-left">{{ props.item.url }}
               <v-chip color="primary" style="color:white" label small v-for="tag in props.item.tags" v-bind:key="tag">{{tag}}</v-chip>
             </td>
@@ -197,6 +207,7 @@ export default {
         { text: "Broken", value: "broken" }
       ],
       items: store.state.urls,
+      selectedItems: [],
       newUrl: "",
       newTag: "",
       autoDiscovery: {
@@ -225,15 +236,16 @@ export default {
       this.autoDiscovery.active = true;
 
       let filteredUrls;
-      if (this.selectedTags.length == 0) {
+      if (this.selectedItems.length > 0) {
+        filteredUrls = this.selectedItems;
+      } else if (this.selectedTags.length == 0) {
         filteredUrls = this.state.urls
         .filter(function(url) {
           let lastWeek = new Date();
           lastWeek.setDate(lastWeek.getDate() - 7);
           return new Date(url.lastVerified) < lastWeek;
         })
-      }
-      else {
+      } else {
         filteredUrls = this.state.urls
           .filter((url) => {
             for(let tag of this.selectedTags) {
@@ -322,6 +334,12 @@ export default {
       });
 
       return [...tags];
+    },
+    selectedItemsCount: function() {
+      if (this.selectedItems.length == 0) {
+        return '';
+      }
+      return ` (${this.selectedItems.length})`;
     }
   },
   mounted() {

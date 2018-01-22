@@ -31,6 +31,9 @@ class MutableState
 		//data is an object of lists that can accumulate data items. good for aggregate results from tasks.
 		this.data = clone(state.data) || {};
 
+		//endpoints allow tasks to publish access information to the task
+		this.endpoints = clone(state.endpoints) || {};
+
 		//keep a short log for the task
 		this.log = [];
 	}
@@ -56,6 +59,9 @@ class MutableState
 			case 'data-delete':
 				this.mutateDataDelete(update.key,update.value);
 				break;
+
+			case 'endpoints':
+				this.mutateEndpoints(update.key,update.value);
 
 			case 'log':
 				this.mutateLog(update.value);
@@ -128,6 +134,28 @@ class MutableState
 				key: key,
 				value: value
 			});
+		}
+	}
+
+	mutateEndpoints(key,value) {
+		if (value) {
+			if (this.endpoints[key] !== value) {
+				this.endpoints[key] = value;
+				this.emit('mutate', {
+					type:'endpoints',
+					key: key,
+					value: value
+				});
+			}
+		} else {
+			if (key in this.endpoints) {
+				delete this.endpoints[key];
+				this.emit('mutate', {
+					type:'endpoints',
+					key: key,
+					value: value
+				});
+			}
 		}
 	}
 

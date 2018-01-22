@@ -51,8 +51,13 @@ function createDetails(type, id) {
 			throw "Unsupported GWC type: " + type;
 	}
 
-	jobDetails.name += ' ' + url;
-	jobDetails.state.url = url;
+	if (url) {
+		jobDetails.name += ' ' + url;
+		jobDetails.state.url = url;
+		jobDetails.endpoints = {
+			'api': url
+		}
+	}
 
 	if (config.production) {
 		jobDetails.args.push('-env=Production')

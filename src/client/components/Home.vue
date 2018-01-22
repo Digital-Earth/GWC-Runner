@@ -108,6 +108,12 @@
                         <div class="graph big">
                             <vue-chart type="bar" :data="rootsFreshness" :options="bigChartOptions"></vue-chart>
                         </div>
+                        <v-container grid-list-md text-xs-center>
+                                <v-layout row wrap>
+                                    <v-flex>Coverage: {{rootsFreshness.precentage}}%</v-flex>
+                                    <v-flex>Average Root Freshness: {{rootsFreshness.average}} days ago</v-flex>
+                                </v-layout>
+                            </v-container>
                     </v-card>
                 </v-flex>
             </v-layout>
@@ -295,6 +301,8 @@ export default {
 
       let freshness = [];
       let labels = [];
+      let total = 0;
+      let average = 0;
 
       for (let i = 0; i <= 30; i++) {
         labels[i] = i;
@@ -313,14 +321,22 @@ export default {
             return;
         }
         freshness[diffInDays]++;
+        average += diffInDays;
+        total++;
       });
 
-        labels[0] = 'Today';
-        labels.reverse();
-        freshness.reverse();
+      average = Math.round(average / total);
+
+      labels[0] = 'Today';
+      labels.reverse();
+      freshness.reverse();
+      
 
       return {
         labels: labels,
+        total: total,
+        average: average,
+        precentage: Math.floor(total * 100 / (this.roots.roots || 1)),
         datasets: [
           {
             label: "roots",
@@ -380,6 +396,6 @@ export default {
   height: 30px;
 }
 .graph.big {
-  height: 200px;
+  height: 160px;
 }
 </style>
