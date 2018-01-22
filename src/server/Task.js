@@ -56,6 +56,7 @@ class Task {
 		this.killCommand = options.killCommand;
 		this.killCommandTimeout = options.killCommandTimeout;
 		this.usageRefreshRate = options.usageRefreshRate;
+		this.lastIoTime = new Date();
 
 		this.logFile = options.logFile;
 		this.logParser = options.logParser;
@@ -100,6 +101,8 @@ class Task {
 		}
 
 		child.stdout.on('data', function (data) {
+
+			self.lastIoTime = new Date();
 			if (self.logStream) {
 				self.logStream.write(data);
 			}
@@ -117,6 +120,7 @@ class Task {
 		});
 
 		child.stderr.on('data', function (data) {
+			self.lastIoTime = new Date();
 			if (self.logStream) {
 				self.logStream.write(data);
 			}
@@ -167,6 +171,9 @@ class Task {
 					//measure idle item
 					if (newUsage.cpu < 1) {
 						newUsage.idleFrom = newUsage.idleFrom || new Date();
+						if (newUsage.idleFrom < self.lastIoTime) {
+							newUsage.idleFrom = self.lastIoTime;
+						}
 					} else {
 						delete newUsage.idleFrom;
 					}
