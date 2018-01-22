@@ -209,7 +209,7 @@ class TaskAction extends Action {
 				self.task = state;
 				rootJob.state.mutateData('tasks',state.id);
 				if (self.publish) {
-					rootJob.state.mutateData(self.publish.name,self.publish.endpoint);
+					rootJob.state.mutateData(self.publish.name,self.publish.value);
 				}
 				self.emit('start');
 				
@@ -218,7 +218,7 @@ class TaskAction extends Action {
 					self.result = state;
 					self.job.getRootJob().state.mutateDataDelete('tasks',state.id);
 					if (self.publish) {
-						rootJob.state.mutateDataDelete(self.publish.name,self.publish.endpoint);
+						rootJob.state.mutateDataDelete(self.publish.name,self.publish.value);
 					}
 
 					if (self.job.status == StatusCodes.cancelled) {
@@ -395,13 +395,13 @@ ee(Job.prototype);
  * 
  * action = job.keepAlive({lb}, {instancePerNode:1});
  *
- * //tasks endpoint can be published for load-balancer to use
+ * //publish a value while task is running can be done using the publish
  * for (number of servers) {
- * 		job	.keepAlive({gwc}, {'publish':{'name':server','endpoint':endpoint}});
+ * 		job	.keepAlive({gwc}, {'publish':{'name':server','value':number}});
  * }
  * 
- * //this wil lcause job start to publish all tasks endpoints
- * job.state.state['server'] = [endpoint1,endpoint2]
+ * //this will allow you to query which tasks are running
+ * job.state.data['server'] = [1,2,3]
  * 
  * options:
  *    instances: number

@@ -34,6 +34,9 @@ module.exports = {
 		memoryLimitInMB: 1400
 	},
 	production: false,
+	cluster: {
+		dev: true
+	},
 	repo:{
 		type: 'azure-blob',
 		account: 'wvgwc',

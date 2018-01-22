@@ -20,7 +20,7 @@ if (process.env.NODE_ENV === 'production') {
 
 const server = new http.Server(app);
 
-const master = process.argv[2] || 'http://localhost:8080';
+const master = process.argv[2] || 'http://localhost:8081';
 
 console.log('master: ' + master);
 

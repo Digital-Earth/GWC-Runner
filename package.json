@@ -6,6 +6,8 @@
   "private": true,
   "scripts": {
     "dev": "cross-env node src/app.js",
+    "root": "cross-env node src/rootNode.js",
+    "node": "cross-env node src/node.js",
     "test": "jasmine",
     "build": "cross-env NODE_ENV=production webpack --progress --hide-modules",
     "production": "cross-env NODE_ENV=production node src/app.js"

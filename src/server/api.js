@@ -1,9 +1,10 @@
+let config = require('./config');
 let serverContext = require('./ServerContext');
-var Job = require('./Job');
-var config = require('./config');
-var debounce = require('debounce');
+const Job = require('./Job');
+const debounce = require('debounce');
+const ioClient = require('socket.io-client');
 
-const { ClusterTaskManager, LocalTaskManager } = require('./TaskManager');
+const { ClusterTaskManager, RemoteTaskManager, LocalTaskManager } = require('./TaskManager');
 
 const createGwcDetails = require('./jobs/gwc');
 
@@ -14,13 +15,17 @@ Api.attach = function (server, app) {
 
 	var io = require('socket.io')(server);
 
-	let nodesSocket = io.of('/node');
+	if (config.cluster.dev) {
+		let nodesSocket = io.of('/node');
+		serverContext.cluster = new ClusterTaskManager(nodesSocket);
+		serverContext.cluster.addNode('local', new LocalTaskManager());
+	} else {
+		serverContext.cluster = new RemoteTaskManager(ioClient(config.cluster.root + '/app'));
+	}
 
 	serverContext.api = Api;
 	serverContext.config = config;
-	serverContext.cluster = new ClusterTaskManager(nodesSocket);
-	serverContext.cluster.addNode('local', new LocalTaskManager());
-
+	
 	function transformTask(task) {
 		return {
 			id: task.id,
@@ -403,20 +408,28 @@ Api.jobs = {
 
 		let job = new Job('validate')
 
-		job.keepAlive({
-			cwd: config.cli.cwd,
-			exec: config.cli.exec,
-			args: ['url', 'validate', '-n=50', '-clean', details.url],
-			name: 'validate ' + details.url,
-			state: {
-				type: 'validate',
-				url: details.url
-			}
+		let skipDataset = 0;
+
+		job.keepAlive(function() {
+			return job.invoke({
+				cwd: config.cli.cwd,
+				exec: config.cli.exec,
+				args: ['url', 'validate', '-n=50', '-clean', '-skip='+skipDataset, details.url],
+				name: 'validate ' + details.url,
+				state: {
+					type: 'validate',
+					url: details.url,
+					skip: skipDataset,
+				}
+			});
 		}, {
 				while: function (taskState) {
 					if (taskState.state.root) {
 						serverContext.emit('root', taskState.state.root);
 						return taskState.state.datasets > 0;
+					} if (skipDataset < 10) {
+						skipDataset++;
+						return true;
 					}
 					return false;
 				}
@@ -488,12 +501,7 @@ Api.jobs = {
 		['master', 'server', 'import'].forEach(function (type) {
 			config.gwc[type + 'Ports'].forEach(function (port, index) {
 				let details = createGwcDetails(type, index);
-				job.keepAlive(details, {
-					publish: {
-						name: type,
-						endpoint: details.state.url
-					}
-				});
+				job.keepAlive(details);
 			})
 		});
 

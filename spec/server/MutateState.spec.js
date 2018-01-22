@@ -96,4 +96,18 @@ describe('MutableState', function () {
 		expect(linked.data.collection.length).toEqual(2);
 		expect(linked.data.collection).toEqual([1,3]);
 	});
+
+	it('mutateEndpoints can be used to link state', function () {
+		let state = new MutableState({id:1, name:'state'});
+
+		let linked = linkStates(state);
+
+		state.mutateEndpoints('api','http://localhost:80/api/v1/');
+		expect(linked.endpoints['api']).toEqual('http://localhost:80/api/v1/');
+
+
+		state.mutateEndpoints('api',null);
+		expect(linked.endpoints['api']).not.toBeDefined();
+
+	});
 });
