@@ -13,8 +13,14 @@
 		{
 			"type": "node",
 			"request": "launch",
-			"name": "Launch Program",
+			"name": "Launch DEV UI",
 			"program": "${workspaceRoot}\\src\\app.js"
+		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Launch rootNode",
+			"program": "${workspaceRoot}\\src\\rootNode.js"
 		}
 	]
 }

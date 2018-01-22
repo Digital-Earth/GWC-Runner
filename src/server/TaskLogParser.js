@@ -10,6 +10,9 @@ class TaskLogParser {
 				},
 				'PUSH': function (task, key, value) {
 					task.state.mutateData(key, value);
+				},
+				'ENDPOINT': function (task, key, value) {
+					task.state.mutateEndpoints(key, value);
 				}
 			},
 			logSize: 10,

@@ -4,6 +4,11 @@ var config = require('./config');
 //overwrite config with production settings
 config.production = true;
 
+config.cluster = {
+	dev: false,
+	root: 'http://localhost:8081'
+}
+
 config.gwc = extend(config.gwc, {
 	host: 'http://*',
 	cwd: 'C:\\Pyxis\\NextGen\\GeoWebCore\\',
