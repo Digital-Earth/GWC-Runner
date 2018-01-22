@@ -13,13 +13,7 @@
 			<div class="inside">
 				<task class="task" v-for="task in state.jobTasks[job.id]" v-bind:key="task.id" v-bind:task="task" v-on:close="removeTask(task)"></task>
 			</div>
-		</div>
-
-		<h2 class="space">Tasks
-			
-		</h2>
-
-		
+		</div>	
 	</div>
 </template>
 
