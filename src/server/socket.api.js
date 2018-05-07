@@ -37,6 +37,12 @@ Api.attachRestAPI = function(app) {
 		res.end();
 	});
 
+	app.get('/endpoints', function(req, res) {
+		let endpoints = serverContext.cluster.tasks().filter(task=>Object.keys(task.endpoints).length>0).map(task=>{ return { endpoints:task.endpoints, details:task.details, state: task.state}});
+		res.send(JSON.stringify(endpoints));
+		res.end();
+	});
+
 	/*
 
 	TODO: change job tracking API to allow get endpoints by app/job/task-name/

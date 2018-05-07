@@ -24,6 +24,7 @@ module.exports = {
 		masterPorts: [64444],
 		serverPorts: [63000,63001,63002,63003],
 		importPorts: [64000],
+		searchPorts: [64100,64101,64102,64103,64104,64105],
 
 		//if true, the the runner will make sure those instance keep starting.
 		keepAlive: true,

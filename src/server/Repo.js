@@ -9,7 +9,7 @@ class Repo {
 		this.blobService = azure.createBlobService(config.account, config.key);
 		this.container = config.container;
 
-		this.localRepoDir = ".repo";
+		this.localRepoDir = config.path || ".repo";
 
 		if (!fs.existsSync(this.localRepoDir)) {
 			fs.mkdirSync(this.localRepoDir);
@@ -38,53 +38,78 @@ class Repo {
 		let fileName = this.getFileName(product, version)
 		let filePath = this.getFilePath(product, version);
 
-		let stream = tar.c({
-			gzip: true, 
-			file: filePath, 
-			C: folder, 
-			filter: function (entry, stat) {
-				console.log(entry);
-				if (entry == "./.pyx") { return false; }
-				return true;
-			}
-		}, ['.']).then(() => {
-			this.blobService.createBlockBlobFromLocalFile(this.container, fileName, filePath, {
-				metadata: {
-					product: product,
-					version: version
+		let self = this;
+		let promise = new Promise((resolve, reject) => {
+			let stream = tar.c({
+				gzip: true,
+				file: filePath,
+				C: folder,
+				filter: function (entry, stat) {
+					console.log(entry);
+					if (entry == "./.pyx") { return false; }
+					return true;
 				}
-			}, (error, result, response) => {
-				callback(error, filePath);
+			}, ['.']).then(() => {
+				self.blobService.createBlockBlobFromLocalFile(self.container, fileName, filePath, {
+					metadata: {
+						product: product,
+						version: version
+					}
+				}, (error, result, response) => {
+					if (error) {
+						reject(error);
+					} else {
+						resolve(filePath);
+					}
+				});
 			});
 		});
+
+		if (callback) {
+			promise.then((path) => callback(null, path), (error) => callback(error, null));
+		}
+
+		return promise;
 	}
 
 	download(product, version, callback) {
 		let filePath = this.getFilePath(product, version)
 		let productDir = filePath.replace('.tgz', '');
 
-		function extractTarFile() {
-			if (!fs.existsSync(productDir)) {
-				fs.mkdirSync(productDir);
+		let self = this;
+		let promise = new Promise((resolve, reject) => {
+			function extractTarFile() {
+				if (fs.existsSync(productDir)) {
+					resolve(productDir);
+					return;
+				} else {
+					fs.mkdirSync(productDir);
+				}
+				tar.x({
+					gzip: true,
+					file: filePath,
+					C: productDir
+				}).then(function () {
+					resolve(productDir);
+				}, function (error) {
+					reject(error);
+				})
 			}
-			tar.x({ 
-				gzip: true, 
-				file: filePath, 
-				C: productDir 
-			}).then(function () {
-				callback(null, filePath);
-			}, function (error) {
-				callback(error, filePath);
-			})
+
+			if (fs.existsSync(filePath)) {
+				extractTarFile();
+			} else {
+				self.blobService.getBlobToLocalFile(self.container, self.getFileName(product, version), filePath, (error, result, response) => {
+					extractTarFile();
+				});
+			}
+		});
+
+		if (callback) {
+			promise.then((path) => callback(null, path), (error) => callback(error, null));
 		}
 
-		if (fs.existsSync(filePath)) {
-			extractTarFile();
-		} else {
-			this.getBlobToFile(this.container, this.getFileName(product, version), filePath, (error, result, response) => {
-				extractTarFile();
-			});
-		}
+		return promise;
 	}
 }
 

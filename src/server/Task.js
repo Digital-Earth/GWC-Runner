@@ -1,7 +1,6 @@
 const extend = require('extend');
 const { spawn } = require('child_process');
 const fs = require('fs');
-const EventEmitter = require('events');
 const processUsage = require('pidusage');
 const TaskLogParser = require('./TaskLogParser');
 const { MutableState, StatusCodes } = require('./MutableState');
@@ -46,7 +45,8 @@ class Task {
 			status: StatusCodes.new,
 			state: options.state,
 			data: options.data,
-			details: options.details
+			details: options.details,
+			endpoints: options.endpoints
 		});
 
 		this.cwd = options.cwd;
@@ -62,22 +62,6 @@ class Task {
 
 		if (this.logFile) {
 			this.logStream = fs.createWriteStream(this.logFile);
-		}
-
-		//TODO: remove?
-		this.ee = new EventEmitter();
-
-		this.ee.on('exit', function () {
-			if (this.logStream) {
-				this.logStream.end();
-			}
-		})
-
-		//TODO: remove?
-		if (options.on) {
-			for (var eventName in options.on) {
-				this.ee.on(eventName, options.on[eventName]);
-			}
 		}
 	}
 
@@ -103,7 +87,6 @@ class Task {
 			if (self.logStream) {
 				self.logStream.write(data);
 			}
-			self.ee.emit('stdout', self, data);
 
 			stdout += data.toString();
 
@@ -120,7 +103,6 @@ class Task {
 			if (self.logStream) {
 				self.logStream.write(data);
 			}
-			self.ee.emit('stderr', self, data);
 		});
 
 		child.on('close', function (code) {
@@ -135,23 +117,19 @@ class Task {
 				clearTimeout(self.updateUsageTimeoutId);
 			}
 			processUsage.unmonitor(self.pid)
-
-			//TODO: remove?
-			self.ee.emit('exit', self, code);
 		});
 
 		child.on('error', function (error) {
 
 			self.state.mutateState('error', error);
 			self.state.mutateStatus(StatusCodes.error);
-
-			self.ee.emit('error', self, error);
 		});
 
 		this.pid = child.pid;
 
 		self.state.mutateStatus(StatusCodes.running);
 		self.state.mutateState('startTime', new Date());
+		self.state.mutateState('pid', this.pid);
 		self.state.mutateUsage({ cpu: 0, memory: 0 });
 
 		this.updateUsage();
@@ -200,18 +178,6 @@ class Task {
 		if (this.state.status !== StatusCodes.done && !this.childProcess.killed) {
 			this.childProcess.kill();
 		}
-	}
-
-	on(event, callback) {
-		this.ee.on(event, callback);
-	}
-
-	off(event, callback) {
-		this.ee.removeListener(event, callback);
-	}
-
-	once(event, callback) {
-		this.ee.once(event, callback);
 	}
 }
 

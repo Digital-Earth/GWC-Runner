@@ -16,6 +16,9 @@ config.gwc = extend(config.gwc, {
 	
 	cacheFolder: 'P:\\PYXCache.new\\',
 	filesFolder: 'S:\\Galleries\\',
+	
+	serverPorts: [63000,63001,63002,63003,63004,63005,63006,63007],
+	searchPorts: []	
 });
 
 module.exports = config;

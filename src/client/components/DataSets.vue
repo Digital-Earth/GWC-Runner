@@ -239,31 +239,36 @@ export default {
       if (this.selectedItems.length > 0) {
         filteredUrls = this.selectedItems;
       } else if (this.selectedTags.length == 0) {
-        filteredUrls = this.state.urls
-        .filter(function(url) {
+        filteredUrls = this.state.urls.filter(function(url) {
+          if (url.tags.indexOf("disabled") != -1) {
+            return false;
+          }
           let lastWeek = new Date();
           lastWeek.setDate(lastWeek.getDate() - 7);
           return new Date(url.lastVerified) < lastWeek;
-        })
+        });
       } else {
-        filteredUrls = this.state.urls
-          .filter((url) => {
-            for(let tag of this.selectedTags) {
-              if (url.tags.indexOf(tag)==-1) {
-                return false;
-              }
+        filteredUrls = this.state.urls.filter(url => {
+          for (let tag of this.selectedTags) {
+            if (url.tags.indexOf(tag) == -1) {
+              return false;
             }
-            return true;
-          });
+          }
+          return true;
+        });
       }
 
-      this.autoDiscovery.urls = filteredUrls
-        .sort(function(a, b) {
-          return a.verified - b.verified;
-        })
-        .map(url => url.url);
+      filteredUrls = filteredUrls.sort(function(a, b) {
+        return new Date(a.lastVerified) - new Date(b.lastVerified);
+      });
 
-      this.$socket.emit("start-discover-and-validate", this.autoDiscovery.urls, this.parallel);
+      this.autoDiscovery.urls = filteredUrls.map(url => url.url);
+
+      this.$socket.emit(
+        "start-discover-and-validate",
+        this.autoDiscovery.urls,
+        this.parallel
+      );
     },
     addNewUrl() {
       if (
@@ -293,22 +298,27 @@ export default {
       let newTags = [];
       let removedTags = [];
 
-      for(let tag of this.tagsDialog.tags) {
+      for (let tag of this.tagsDialog.tags) {
         if (this.tagsDialog.root.tags.indexOf(tag) == -1) {
           newTags.push(tag);
         }
       }
 
-      for(let tag of this.tagsDialog.root.tags) {
+      for (let tag of this.tagsDialog.root.tags) {
         if (this.tagsDialog.tags.indexOf(tag) == -1) {
           removedTags.push(tag);
         }
       }
 
-      console.log(newTags,removedTags);
+      console.log(newTags, removedTags);
 
       if (newTags.length > 0 || removedTags.length > 0) {
-        this.$socket.emit("update-tags", this.tagsDialog.root.url, newTags, removedTags);
+        this.$socket.emit(
+          "update-tags",
+          this.tagsDialog.root.url,
+          newTags,
+          removedTags
+        );
       }
 
       this.tagsDialog.active = false;
@@ -337,7 +347,7 @@ export default {
     },
     selectedItemsCount: function() {
       if (this.selectedItems.length == 0) {
-        return '';
+        return "";
       }
       return ` (${this.selectedItems.length})`;
     }

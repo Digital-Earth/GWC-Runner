@@ -28,6 +28,14 @@ function createDetails(type, id) {
 			url += config.gwc.importPorts[id]
 			jobDetails.state.gwc = true;
 			break;
+		case 'search':
+			url += config.gwc.searchPorts[id];
+			jobDetails.state.segment = id;
+			jobDetails.state.segments = config.gwc.searchPorts.length;
+			jobDetails.state.gwc = true;
+			jobDetails.args.push('-segment='+jobDetails.state.segment);
+			jobDetails.args.push('-segments='+jobDetails.state.segments);
+			break;
 		case 'validate-checksum':
 			url = '';
 			jobDetails.args.push('-vc');
@@ -53,10 +61,6 @@ function createDetails(type, id) {
 
 	if (url) {
 		jobDetails.name += ' ' + url;
-		jobDetails.state.url = url;
-		jobDetails.endpoints = {
-			'api': url
-		}
 	}
 
 	if (config.production) {

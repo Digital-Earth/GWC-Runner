@@ -5,7 +5,7 @@ const getPort = require('get-port');
 const io = require('socket.io-client');
 const { MutableState } = require('./server/MutableState');
 const Task = require('./server/Task');
-const {LocalTaskManager} = require('./server/TaskManager');
+const { LocalTaskManager } = require('./server/TaskManager');
 
 const app = express();
 
@@ -24,21 +24,21 @@ const master = process.argv[2] || 'http://localhost:8081';
 
 console.log('master: ' + master);
 
-const masterClient = io(master+"/node");
+const masterClient = io(master + "/node");
 
-const manager = new LocalTaskManager(masterClient);
+const manager = new LocalTaskManager(masterClient, config);
 
-masterClient.on('connect',function() {
+masterClient.on('connect', function () {
 	console.log('connected to master', master);
 });
 
-masterClient.on('disconnect',function() {
+masterClient.on('disconnect', function () {
 	console.log('disconnected from master', master);
 });
 
 //TODO: think if we need http in the first place?
-getPort().then(function(port) {
-	server.listen(port, function(err) {		
+getPort().then(function (port) {
+	server.listen(port, function (err) {
 		console.log('live and running at ' + port);
 	});
 })

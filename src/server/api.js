@@ -18,7 +18,7 @@ Api.attach = function (server, app) {
 	if (config.cluster.dev) {
 		let nodesSocket = io.of('/node');
 		serverContext.cluster = new ClusterTaskManager(nodesSocket);
-		serverContext.cluster.addNode('local', new LocalTaskManager());
+		serverContext.cluster.addNode('local', new LocalTaskManager(null, config));
 	} else {
 		serverContext.cluster = new RemoteTaskManager(ioClient(config.cluster.root + '/app'));
 	}
@@ -261,6 +261,17 @@ Api.attach = function (server, app) {
 		res.end();
 	});
 
+	app.get('/tasks', function (req, res) {
+		res.send(JSON.stringify(serverContext.cluster.tasks()));
+		res.end();
+	});
+
+	app.get('/endpoints', function(req, res) {
+		let endpoints = serverContext.cluster.tasks().filter(task=>Object.keys(task.endpoints).length>0).map(task=>{ return { endpoints:task.endpoints, details:task.details, state: task.state}});
+		res.send(JSON.stringify(endpoints));
+		res.end();
+	});
+
 	app.get('/jobs/:id', function (req, res) {
 		let job = serverContext.jobs.filter(job => job.id == req.params.id || job.name == req.params.id)[0];
 		if (job) {
@@ -304,6 +315,9 @@ Api.jobs = {
 		let job = new Job('list urls');
 
 		job.invoke({
+			//product: 'cli',
+			//version: '1.0.0',
+			//exec: 'pyx.exe',
 			cwd: config.cli.cwd,
 			exec: config.cli.exec,
 			args: ['url', 'list', '-json'],
@@ -312,7 +326,7 @@ Api.jobs = {
 				type: 'list',
 			}
 		}).then(function (taskState) {
-			let roots = taskState.data.roots.map((root) => {
+			let roots = (taskState.data.roots || []).map((root) => {
 				return {
 					url: root.Uri,
 					status: root.Status,
@@ -498,7 +512,7 @@ Api.jobs = {
 	gwc: function (details) {
 		let job = new Job('gwc');
 
-		['master', 'server', 'import'].forEach(function (type) {
+		['master', 'server', 'import', 'search'].forEach(function (type) {
 			config.gwc[type + 'Ports'].forEach(function (port, index) {
 				let details = createGwcDetails(type, index);
 				job.keepAlive(details);
