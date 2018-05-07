@@ -15,7 +15,10 @@ Api.attach = function (server, app) {
 
 	var io = require('socket.io')(server);
 
-	if (config.cluster.dev) {
+	//enable production when we have a cluster ready
+	let startLocalNode = true; //config.cluster.dev
+	
+	if (startLocalNode) {
 		let nodesSocket = io.of('/node');
 		serverContext.cluster = new ClusterTaskManager(nodesSocket);
 		serverContext.cluster.addNode('local', new LocalTaskManager(null, config));
