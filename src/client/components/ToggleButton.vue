@@ -138,9 +138,9 @@ export default {
 }
 </script>
 
-<style lang="scss" scoped>
-$height: 22px;
-$margin: 3px;
+<style lang="stylus" scoped>
+$height = 22px;
+$margin = 3px;
 // $core-size: $height - 2 * $margin;
 .vue-js-switch {
   display: inline-block;
