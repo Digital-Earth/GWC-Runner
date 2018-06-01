@@ -1,552 +1,637 @@
-let config = require('./config');
-let serverContext = require('./ServerContext');
+const fs = require('fs');
+const socketIo = require('socket.io');
+const parseArgs = require('minimist');
+const config = require('./config');
+const serverContext = require('./ServerContext');
+const TaskResolver = require('./TaskResolver');
 const Job = require('./Job');
-const debounce = require('debounce');
-const ioClient = require('socket.io-client');
 
-const { ClusterTaskManager, RemoteTaskManager, LocalTaskManager } = require('./TaskManager');
+const { ClusterTaskManager, LocalTaskManager, RemoteTaskManager } = require('./TaskManager');
 
 const createGwcDetails = require('./jobs/gwc');
 
-var Api = {}
+const activeDeploymentFile = 'cluster.config.json';
 
-Api.attach = function (server, app) {
-	console.log('setup socket.io API');
+const Api = {};
 
-	var io = require('socket.io')(server);
+Api.attach = (server, app) => {
+  const options = parseArgs(process.argv);
+  console.log('setup socket.io API');
 
-	//enable production when we have a cluster ready
-	let startLocalNode = true; //config.cluster.dev
-	
-	if (startLocalNode) {
-		let nodesSocket = io.of('/node');
-		serverContext.cluster = new ClusterTaskManager(nodesSocket);
-		serverContext.cluster.addNode('local', new LocalTaskManager(null, config));
-	} else {
-		serverContext.cluster = new RemoteTaskManager(ioClient(config.cluster.root + '/app'));
-	}
+  const io = socketIo(server);
 
-	serverContext.api = Api;
-	serverContext.config = config;
-	
-	function transformTask(task) {
-		return {
-			id: task.id,
-			node: task.node,
-			name: task.name,
-			status: task.status,
-			details: task.details,
-			usage: task.usage || { cpu: 0, memory: 0 },
-			info: task.state || {},
-			log: task.log || []
-		}
-	}
+  const nodesSocket = io.of('/node');
+  serverContext.cluster = new ClusterTaskManager(nodesSocket);
 
-	function transformJob(job) {
-		return {
-			id: job.id,
-			name: job.name,
-			status: job.state.status,
-			state: job.state.state,
-			data: job.state.data,
-			details: job.state.details
-		}
-	}
+  if (fs.existsSync(activeDeploymentFile)) {
+    Api.activeDeployment = JSON.parse(fs.readFileSync(activeDeploymentFile, 'utf8'));
+  }
 
-	function sendInitialUpdate() {
-		io.emit('tasks', serverContext.cluster.tasks().map(transformTask));
-		io.emit('roots', serverContext.roots || []);
-		io.emit('gallery-status', serverContext.geoSources || []);
-		sendCluster();
-		sendJobs();
-	}
+  if (options.cluster) {
+    /* eslint-disable global-require */
+    const socketClient = require('socket.io-client');
+    const cluster = socketClient(`${options.cluster}/cluster`);
+    serverContext.cluster.addNode('cluster', new RemoteTaskManager(cluster));
+  } else {
+    const { nodeConfig } = serverContext;
+    const taskResolver = new TaskResolver(nodeConfig);
+    const localConfig = {
+      resolveDetails: (details, callback) => taskResolver.resolveDetails(details, callback),
+      info: {
+        name: `${serverContext.nodeConfig.ip}:${serverContext.nodeConfig.nodePort}`,
+        config: serverContext.nodeConfig,
+      },
+    };
+    serverContext.cluster.addNode('local', new LocalTaskManager(null, localConfig));
+  }
 
-	serverContext.on('roots', function (roots) {
-		io.emit('roots', roots || []);
-	});
+  serverContext.api = Api;
+  serverContext.config = config;
 
-	serverContext.on('geoSources', function (geoSources) {
-		io.emit('gallery-status', serverContext.geoSources || []);
-	});
+  function transformTask(task) {
+    return {
+      id: task.id,
+      node: task.node,
+      name: task.name,
+      status: task.status,
+      details: task.details,
+      endpoints: task.endpoints,
+      usage: task.usage || { cpu: 0, memory: 0 },
+      info: task.state || {},
+      log: task.log || [],
+    };
+  }
 
-	function sendTaskUpdate(task) {
-		io.emit('task-update', transformTask(task));
-	}
+  function transformJob(job) {
+    return {
+      id: job.id,
+      name: job.name,
+      status: job.state.status,
+      state: job.state.state,
+      data: job.state.data,
+      details: job.state.details,
+    };
+  }
 
-	function sendCluster() {
-		io.emit('cluster', serverContext.cluster.nodes() || []);
-	}
+  function sendTaskUpdate(task) {
+    io.emit('task-update', transformTask(task));
+  }
 
-	function sendJobs() {
-		io.emit('jobs', serverContext.jobs.map(transformJob));
-	}
+  function sendJobs() {
+    io.emit('jobs', serverContext.jobs.map(transformJob));
+  }
 
-	function sendJobUpdate(job) {
-		io.emit('job-update', transformJob(job));
-	}
+  function sendJobUpdate(job) {
+    io.emit('job-update', transformJob(job));
+  }
 
-	serverContext.on('job',(job) => sendJobUpdate(job));
+  function handleActiveDeployment(/* deployment */) {
+    io.emit('active-deployment', Api.activeDeployment);
+  }
 
-	serverContext.jobs = [];
+  function sendInitialUpdate() {
+    io.emit('tasks', serverContext.cluster.tasks().map(transformTask));
+    io.emit('roots', serverContext.roots || []);
+    io.emit('nodes', serverContext.nodes || []);
+    io.emit('gallery-status', serverContext.geoSources || []);
+    io.emit('active-deployment', Api.activeDeployment);
+    sendJobs();
+  }
 
-	Api.trackJob = function (job) {
-		job.on('start', function () {
-			serverContext.jobs.push(job);
-			serverContext.emit('job',job);
-		});
+  serverContext.on('roots', (roots) => {
+    io.emit('roots', roots || []);
+  });
 
-		job.state.on('mutate', function () {
-			serverContext.emit('job',job);
-		});
+  serverContext.on('nodes', (nodes) => {
+    io.emit('nodes', nodes || []);
+  });
 
-		job.on('done', function () {
-			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
-			serverContext.emit('job',job);
-		});
+  serverContext.on('geoSources', (/* goeSources */) => {
+    io.emit('gallery-status', serverContext.geoSources || []);
+  });
 
-		job.on('cancelled', function () {
-			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
-			serverContext.emit('job',job);
-		});
-	}
+  serverContext.on('job', job => sendJobUpdate(job));
 
-	serverContext.cluster.on('new-task', sendTaskUpdate);
-	serverContext.cluster.on('task-end', sendTaskUpdate);
-	serverContext.cluster.on('mutate', sendTaskUpdate);
+  serverContext.jobs = [];
 
-	serverContext.cluster.on('new-node', sendCluster);
-	serverContext.cluster.on('node-detach', sendCluster);
+  Api.trackJob = (job) => {
+    job.on('start', () => {
+      serverContext.jobs.push(job);
+      serverContext.emit('job', job);
+    });
 
-	io.on('connection', (socket) => {
-		console.log('connected')
+    job.state.on('mutate', () => {
+      serverContext.emit('job', job);
+    });
 
-		sendInitialUpdate();
+    job.on('done', () => {
+      serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
+      serverContext.emit('job', job);
+    });
 
-		socket.on('kill-task', function (taskId) {
-			serverContext.cluster.killTaskById(taskId);
-		});
+    job.on('cancelled', () => {
+      serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
+      serverContext.emit('job', job);
+    });
+  };
 
-		socket.on('start-add-url', function (url) {
-			let job = Api.jobs.addUrl({ url: url });
-			Api.trackJob(job);
-			job.start();
-		})
+  serverContext.cluster.on('new-task', sendTaskUpdate);
+  serverContext.cluster.on('task-end', sendTaskUpdate);
+  serverContext.cluster.on('mutate', sendTaskUpdate);
 
+  serverContext.nodes = serverContext.cluster.nodes();
 
-		socket.on('start-validate', function (url) {
-			let job = Api.jobs.validate({ url: url });
-			Api.trackJob(job);
-			job.start();
-		})
+  serverContext.cluster.on('node-connected', (node) => {
+    console.log('connnected', node);
+    serverContext.nodes.push(node);
+    serverContext.emit('nodes', serverContext.nodes);
+  });
+  serverContext.cluster.on('node-disconnected', (node) => {
+    console.log('disconnnected', node);
+    const nodes = serverContext.nodes.filter(n => n.id !== node.id);
+    serverContext.emit('nodes', nodes);
+  });
 
-		socket.on('start-discover', function (url) {
-			let job = Api.jobs.discover({ url: url });
-			Api.trackJob(job);
-			job.start();
-		})
+  io.on('connection', (socket) => {
+    console.log('connected');
 
-		socket.on('start-discover-and-validate', function (urls, parallel) {
-			let job = Api.jobs.autoDiscover({ urls: urls, parallel: parallel || 3 });
-			Api.trackJob(job);
-			job.start();
-		})
+    sendInitialUpdate();
 
-		socket.on('update-tags', function (url, addTags, removeTags) {
-			let job = Api.jobs.updateTags({ url, addTags, removeTags });
-			Api.trackJob(job);
-			job.start();
-		})
+    socket.on('kill-task', (taskId) => {
+      serverContext.cluster.killTaskById(taskId);
+    });
 
-		socket.on('start-list', function (url) {
-			let job = Api.jobs.list({});
-			Api.trackJob(job);
-			job.start();
-		})
+    socket.on('kill-job', (jobId) => {
+      for (const job of serverContext.jobs) {
+        if (job.id === jobId) {
+          job.kill();
+        }
+      }
+    });
 
-		socket.on('start-proxy', function (url) {
-			Api.startProxy();
-		});
+    socket.on('start-add-url', (url) => {
+      const job = Api.jobs.addUrl({ url });
+      Api.trackJob(job);
+      job.start();
+    });
 
-		socket.on('stop-proxy', function (url) {
-			Api.stopProxy();
-		});
+    socket.on('set-active-deployment', (deployment) => {
+      fs.writeFileSync(activeDeploymentFile, JSON.stringify(deployment));
+      Api.activeDeployment = deployment;
+      handleActiveDeployment();
+    });
 
-		socket.on('start-gwc', function () {
-			Api.startGwc();
-		});
+    socket.on('start-deploy-deployment', (deployment) => {
+      const job = Api.jobs.deployDeployment(deployment);
+      Api.trackJob(job);
+      job.start();
+    });
 
-		socket.on('stop-gwc', function () {
-			Api.stopGwc();
-		});
+    socket.on('start-remove-deployment', (deployment) => {
+      const job = Api.jobs.removeDeployment(deployment);
+      Api.trackJob(job);
+      job.start();
+    });
 
-		/* BEGIN - ALL LEGACY STUFF - CONSIDER REFACTOR */
+    socket.on('start-list-nodes', () => {
+      const job = Api.jobs.listNodes();
+      Api.trackJob(job);
+      job.start();
+    });
 
-		socket.on('start-download-geosource', function (id) {
-			let job = Api.jobs.gwcDownloadGeoSource({ id: id });
-			Api.trackJob(job);
-			job.start();
-		});
+    socket.on('start-validate', (url) => {
+      const job = Api.jobs.validate({ url });
+      Api.trackJob(job);
+      job.start();
+    });
 
-		socket.on('start-import-geosource', function (id) {
-			let job = Api.jobs.gwcImportGeoSource({ id: id });
-			Api.trackJob(job);
-			job.start();
-		});
+    socket.on('start-discover', (url) => {
+      const job = Api.jobs.discover({ url });
+      Api.trackJob(job);
+      job.start();
+    });
 
-		socket.on('start-gallery-status', function (id) {
-			let job = Api.jobs.gwcGalleryStatus({ id: id });
-			Api.trackJob(job);
-			job.start();
-		});
+    socket.on('start-discover-and-validate', (urls, parallel) => {
+      const job = Api.jobs.autoDiscover({ urls, parallel: parallel || 3 });
+      Api.trackJob(job);
+      job.start();
+    });
 
-		/* END - ALL LEGACY STUFF */
-	});
+    socket.on('update-tags', (url, addTags, removeTags) => {
+      const job = Api.jobs.updateTags({ url, addTags, removeTags });
+      Api.trackJob(job);
+      job.start();
+    });
 
-	//job track api
+    socket.on('start-list', () => {
+      const job = Api.jobs.list({});
+      Api.trackJob(job);
+      job.start();
+    });
 
-	let jobSocket = io.of('/job');
+    socket.on('start-proxy', () => {
+      Api.startProxy();
+    });
 
-	let jobTrackClients = [];
+    socket.on('stop-proxy', () => {
+      Api.stopProxy();
+    });
 
-	jobSocket.on('connection', function(socket) {
-		let trackList = [];
+    socket.on('start-gwc', () => {
+      Api.startGwc();
+    });
 
-		let emit = debounce(function(job) {
-			client.socket.emit('job-update',transformJob(job));
-		},100);
+    socket.on('stop-gwc', () => {
+      Api.stopGwc();
+    });
 
-		let client = {
-			socket,
-			emit,
-			isTracking(job) {
-				return trackList.indexOf(job.id) !== -1 || trackList.indexOf(job.name) !== -1;
-			}
-		};
+    /* BEGIN - ALL LEGACY STUFF - CONSIDER REFACTOR */
 
-		socket.on('start-tracking',function(id) {
-			let index = trackList.indexOf(id);
-			if (index == -1) {
-				trackList.push(id);
+    socket.on('start-download-geosource', (id) => {
+      const job = Api.jobs.gwcDownloadGeoSource({ id });
+      Api.trackJob(job);
+      job.start();
+    });
 
-				//send current state if we are tracking this job
-				for(let job of serverContext.jobs) {
-					if (job.id == id || job.name == id) {
-						client.emit(job);
-					}
-				}
-			};
-		});
-		socket.on('stop-tracking', function(id) {
-			let index = trackList.indexOf(id);
-			if (index != -1) {
-				trackList.splice(index,1);
-			}
-		});
+    socket.on('start-import-geosource', (id) => {
+      const job = Api.jobs.gwcImportGeoSource({ id });
+      Api.trackJob(job);
+      job.start();
+    });
 
-		socket.on('disconnect', function() {
-			jobTrackClients.splice(jobTrackClients.indexOf(client),1);
-		});
+    socket.on('start-gallery-status', (id) => {
+      const job = Api.jobs.gwcGalleryStatus({ id });
+      Api.trackJob(job);
+      job.start();
+    });
 
-		jobTrackClients.push(client);
-	});
+    /* END - ALL LEGACY STUFF */
+  });
 
-	serverContext.on('job', function(job) {
-		for(let client of jobTrackClients) {
-			if (client.isTracking(job)) {
-				client.emit(job);
-			}
-		}
-	});
+  // rest API
+  app.get('/nodes', (req, res) => {
+    res.send(JSON.stringify(serverContext.cluster.nodes()));
+    res.end();
+  });
 
-	//rest API
-	app.get('/nodes', function (req, res) {
-		res.send(JSON.stringify(serverContext.cluster.nodes()));
-		res.end();
-	});
+  app.get('/tasks', (req, res) => {
+    res.send(JSON.stringify(serverContext.cluster.tasks()));
+    res.end();
+  });
 
-	app.get('/tasks', function (req, res) {
-		res.send(JSON.stringify(serverContext.cluster.tasks()));
-		res.end();
-	});
+  app.get('/endpoints', (req, res) => {
+    const endpoints = serverContext.cluster.tasks()
+      .filter(task => Object.keys(task.endpoints).length > 0)
+      .map(task => ({ endpoints: task.endpoints, details: task.details, state: task.state }));
+    res.send(JSON.stringify(endpoints));
+    res.end();
+  });
 
-	app.get('/endpoints', function(req, res) {
-		let endpoints = serverContext.cluster.tasks().filter(task=>Object.keys(task.endpoints).length>0).map(task=>{ return { endpoints:task.endpoints, details:task.details, state: task.state}});
-		res.send(JSON.stringify(endpoints));
-		res.end();
-	});
+  app.get('/jobs/:id', (req, res) => {
+    function jobFilter(job) {
+      return job.id === req.params.id || job.name === req.params.id;
+    }
 
-	app.get('/jobs/:id', function (req, res) {
-		let job = serverContext.jobs.filter(job => job.id == req.params.id || job.name == req.params.id)[0];
-		if (job) {
-			res.send(JSON.stringify(transformJob(job)));
-			res.end();
-		} else {
-			res.status(404);
-			res.send('Job ' + req.params.id + ' not found');
-			res.end();
-		}
-	});
+    const job = serverContext.jobs.filter(jobFilter)[0];
+    if (job) {
+      res.send(JSON.stringify(transformJob(job)));
+      res.end();
+    } else {
+      res.status(404);
+      res.send(`Job ${req.params.id} not found`);
+      res.end();
+    }
+  });
 
-	app.get('/jobs', function (req, res) {
-		res.send(JSON.stringify(serverContext.jobs.map(transformJob)));
-		res.end();
-	});
-}
+  app.get('/jobs', (req, res) => {
+    res.send(JSON.stringify(serverContext.jobs.map(transformJob)));
+    res.end();
+  });
+};
 
-Api.startGwc = function () {
-	Api.gwcJob = Api.jobs.gwc();
-	Api.trackJob(Api.gwcJob);
-	Api.gwcJob.start();
-}
+Api.startGwc = () => {
+  Api.gwcJob = Api.jobs.gwc();
+  Api.trackJob(Api.gwcJob);
+  Api.gwcJob.start();
+};
 
-Api.stopGwc = function () {
-	Api.gwcJob.kill();
-}
+Api.stopGwc = () => {
+  Api.gwcJob.kill();
+};
 
-Api.startProxy = function () {
-	Api.proxyJob = Api.jobs.proxy({ url: 'http://localhost:1337' });
-	Api.trackJob(Api.proxyJob);
-	Api.proxyJob.start();
-}
+Api.startProxy = () => {
+  Api.proxyJob = Api.jobs.proxy({ url: 'http://localhost:1337' });
+  Api.trackJob(Api.proxyJob);
+  Api.proxyJob.start();
+};
 
 Api.stopProxy = function () {
-	Api.proxyJob.kill();
-}
+  Api.proxyJob.kill();
+};
 
 Api.jobs = {
-	list: function (details) {
-		let job = new Job('list urls');
+  list() {
+    const job = new Job('list urls');
 
-		job.invoke({
-			//product: 'cli',
-			//version: '1.0.0',
-			//exec: 'pyx.exe',
-			cwd: config.cli.cwd,
-			exec: config.cli.exec,
-			args: ['url', 'list', '-json'],
-			name: 'list urls',
-			state: {
-				type: 'list',
-			}
-		}).then(function (taskState) {
-			let roots = (taskState.data.roots || []).map((root) => {
-				return {
-					url: root.Uri,
-					status: root.Status,
-					datasets: root.DataSetCount,
-					working: Math.round(100 * root.VerifiedDataSetCount / root.DataSetCount),
-					broken: root.BrokenDataSetCount,
-					verified: root.VerifiedDataSetCount,
-					unknown: root.UnknownDataSetCount,
-					tags: root.Metadata && root.Metadata.Tags ? root.Metadata.Tags : [],
-					lastDiscovered: new Date(root.LastDiscovered),
-					lastVerified: new Date(root.LastVerified)
-				}
-			});
-			serverContext.emit('roots', roots);
-			return roots;
-		}).complete();
+    job.invoke({
+      service: 'cli',
+      deployment: Api.activeDeployment,
+      args: ['url', 'list', '-json'],
+      name: 'list urls',
+      state: {
+        type: 'list',
+      },
+    }).then((taskState) => {
+      const roots = (taskState.data.roots || []).map(root => ({
+        url: root.Uri,
+        status: root.Status,
+        datasets: root.DataSetCount,
+        working: Math.round((100 * root.VerifiedDataSetCount) / root.DataSetCount),
+        broken: root.BrokenDataSetCount,
+        verified: root.VerifiedDataSetCount,
+        unknown: root.UnknownDataSetCount,
+        tags: root.Metadata && root.Metadata.Tags ? root.Metadata.Tags : [],
+        lastDiscovered: new Date(root.LastDiscovered),
+        lastVerified: new Date(root.LastVerified),
+      }));
+      serverContext.emit('roots', roots);
+      return roots;
+    }).complete();
 
-		return job;
-	},
-	addUrl: function (details) {
+    return job;
+  },
+  addUrl(details) {
+    const job = new Job('add url');
+    job.invoke({
+      service: 'cli',
+      deployment: Api.activeDeployment,
+      args: ['url', 'add', details.url],
+      name: `add ${details.url}`,
+      state: {
+        type: 'add',
+        url: details.url,
+      },
+    }).complete();
 
-		let job = new Job('add url');
-		job.invoke({
-			cwd: config.cli.cwd,
-			exec: config.cli.exec,
-			args: ['url', 'add', details.url],
-			name: 'add ' + details.url,
-			state: {
-				type: 'add',
-				url: details.url
-			}
-		}).complete();
+    return job;
+  },
+  updateTags(details) {
+    const job = new Job('update');
+    const args = ['url', 'update'];
 
-		return job;
-	},
-	updateTags: function (details) {
-		let job = new Job('update')
-		let args = ['url', 'update'];
+    if (details.addTags) {
+      for (const tag of details.addTags) {
+        args.push(`-add-tag=${tag}`);
+      }
+    }
+    if (details.removeTags) {
+      for (const tag of details.removeTags) {
+        args.push(`-remove-tag=${tag}`);
+      }
+    }
+    args.push(details.url);
 
-		if (details.addTags) {
-			for (let tag of details.addTags) {
-				args.push('-add-tag=' + tag);
-			}
-		}
-		if (details.removeTags) {
-			for (let tag of details.removeTags) {
-				args.push('-remove-tag=' + tag);
-			}
-		}
-		args.push(details.url);
+    job.invoke({
+      service: 'cli',
+      deployment: Api.activeDeployment,
+      args,
+      state: {
+        type: 'update',
+        url: details.url,
+      },
+    })
+      .then((taskState) => {
+        if (taskState.state.root) {
+          serverContext.emit('root', taskState.state.root);
+        }
+      })
+      .complete();
 
-		job.invoke({
-			cwd: config.cli.cwd,
-			exec: config.cli.exec,
-			args: args,
-			state: {
-				type: 'update',
-				url: details.url,
-			}
-		})
-			.then(function (taskState) {
-				if (taskState.state.root) {
-					serverContext.emit('root', taskState.state.root);
-				}
-			})
-			.complete();
+    return job;
+  },
+  discover(details) {
+    const job = new Job('discover');
 
-		return job;
-	},
-	discover: function (details) {
-		let job = new Job('discover');
+    job.invoke({
+      service: 'cli',
+      deployment: Api.activeDeployment,
+      args: ['url', 'discover', details.url],
+      name: `discover ${details.url}`,
+      state: {
+        type: 'discover',
+        url: details.url,
+      },
+    })
+      .then((taskState) => {
+        if (taskState.state.root) {
+          serverContext.emit('root', taskState.state.root);
+        }
+      })
+      .complete();
 
-		job.invoke({
-			cwd: config.cli.cwd,
-			exec: config.cli.exec,
-			args: ['url', 'discover', details.url],
-			name: 'discover ' + details.url,
-			state: {
-				type: 'discover',
-				url: details.url
-			}
-		})
-			.then(function (taskState) {
-				if (taskState.state.root) {
-					serverContext.emit('root', taskState.state.root);
-				}
-			})
-			.complete();
+    return job;
+  },
+  validate(details) {
+    const job = new Job('validate');
 
-		return job;
-	},
-	validate: function (details) {
+    let skipDataset = 0;
 
-		let job = new Job('validate')
+    job.keepAlive(() => job.invoke({
+      service: 'cli',
+      deployment: Api.activeDeployment,
+      args: ['url', 'validate', '-n=50', '-clean', `-skip=${skipDataset}`, details.url],
+      name: `validate ${details.url}`,
+      state: {
+        type: 'validate',
+        url: details.url,
+        skip: skipDataset,
+      },
+    }), {
+      while(taskState) {
+        if (taskState.state.root) {
+          serverContext.emit('root', taskState.state.root);
+          return taskState.state.datasets > 0;
+        } if (skipDataset < 10) {
+          skipDataset++;
+          return true;
+        }
+        return false;
+      },
+    }).then((taskState) => {
+      if (!taskState.state.root) {
+        return job.invoke({
+          service: 'cli',
+          deployment: Api.activeDeployment,
+          args: ['url', 'update', '-status=Broken', details.url],
+          name: `update ${details.url}`,
+          state: {
+            type: 'update',
+            url: details.url,
+            status: 'Broken',
+          },
+        });
+      } else if (taskState.state.root.status === 'Broken') {
+        return job.invoke({
+          service: 'cli',
+          deployment: Api.activeDeployment,
+          args: ['url', 'update', '-status=Discovered', details.url],
+          state: {
+            type: 'update',
+            url: details.url,
+            status: 'Discovered',
+          },
+        });
+      }
+      return undefined;
+    }).complete();
 
-		let skipDataset = 0;
+    return job;
+  },
+  discoverAndValidate(details) {
+    const job = new Job('discover and validate');
 
-		job.keepAlive(function() {
-			return job.invoke({
-				cwd: config.cli.cwd,
-				exec: config.cli.exec,
-				args: ['url', 'validate', '-n=50', '-clean', '-skip='+skipDataset, details.url],
-				name: 'validate ' + details.url,
-				state: {
-					type: 'validate',
-					url: details.url,
-					skip: skipDataset,
-				}
-			});
-		}, {
-				while: function (taskState) {
-					if (taskState.state.root) {
-						serverContext.emit('root', taskState.state.root);
-						return taskState.state.datasets > 0;
-					} if (skipDataset < 10) {
-						skipDataset++;
-						return true;
-					}
-					return false;
-				}
-			}).then(function (taskState) {
-				if (!taskState.state.root) {
-					return job.invoke({
-						cwd: config.cli.cwd,
-						exec: config.cli.exec,
-						args: ['url', 'update', '-status=Broken', details.url],
-						state: {
-							type: 'update',
-							url: details.url,
-							status: 'Broken'
-						}
-					});
-				} else if (taskState.state.root.status == 'Broken') {
-					return job.invoke({
-						cwd: config.cli.cwd,
-						exec: config.cli.exec,
-						args: ['url', 'update', '-status=Discovered', details.url],
-						state: {
-							type: 'update',
-							url: details.url,
-							status: 'Discovered'
-						}
-					});
-				}
-			}).complete();
+    job.invoke(Api.jobs.discover(details))
+      .invoke(Api.jobs.validate(details))
+      .complete();
 
-		return job;
-	},
-	discoverAndValidate: function (details) {
-		let job = new Job('discover and validate');
+    return job;
+  },
+  autoDiscover(details) {
+    const job = new Job('auto discover');
 
-		job.invoke(Api.jobs.discover(details))
-			.invoke(Api.jobs.validate(details))
-			.complete();
+    const discoverUrl = url => Api.jobs.discoverAndValidate({ url });
+    const discoverUrlOptions = { parallel: details.parallel || 3 };
 
-		return job;
-	},
-	autoDiscover: function (details) {
-		let job = new Job('auto discover');
+    job.forEach(details.urls, discoverUrl, discoverUrlOptions).complete();
 
-		job.forEach(details.urls, function (url) {
-			return Api.jobs.discoverAndValidate({ url: url })
-		}, { parallel: details.parallel || 3 }).complete();
+    return job;
+  },
+  proxy() {
+    const job = new Job('proxy');
 
-		return job;
-	},
-	proxy: function (details) {
-		let job = new Job('proxy');
+    job.forEachNode('*', {
+      name: 'proxy',
+      service: 'proxy',
+      deployment: Api.activeDeployment,
+      state: {
+        type: 'proxy',
+      },
+    }, { while: () => true });
 
-		job.keepAlive({
-			cwd: config.proxy.cwd,
-			exec: config.proxy.exec,
-			args: [config.proxy.start, details.url],
-			name: 'proxy ' + details.url,
-			state: {
-				type: 'proxy',
-				url: details.url
-			}
-		});
+    return job;
+  },
+  gwc(/* details */) {
+    const job = new Job('gwc');
 
-		return job;
-	},
-	gwc: function (details) {
-		let job = new Job('gwc');
+    // ['master', 'server', 'import', 'search'].forEach(function (type) {
+    //  config.gwc[type + 'Ports'].forEach(function (port, index) {
+    //    let details = createGwcDetails(type, index);
+    //    job.keepAlive(details);
+    //  })
+    // });
 
-		['master', 'server', 'import', 'search'].forEach(function (type) {
-			config.gwc[type + 'Ports'].forEach(function (port, index) {
-				let details = createGwcDetails(type, index);
-				job.keepAlive(details);
-			})
-		});
+    job.forEachNode('*', {
+      name: 'gwc',
+      service: 'gwc',
+      deployment: Api.activeDeployment,
+      state: {
+        type: 'server',
+      },
+    }, {
+      while: () => true,
+    });
 
-		return job;
-	},
-	gwcDownloadGeoSource: function (details) {
-		let job = new Job('download GeoSource');
+    job.forEachNode('*', {
+      name: 'gwc',
+      service: 'gwc',
+      deployment: Api.activeDeployment,
+      state: {
+        type: 'server',
+      },
+    }, {
+      while: () => true,
+    });
 
-		job.invoke(createGwcDetails('download-geosource', 'pyxis://' + details.id)).complete();
+    return job;
+  },
+  gwcDownloadGeoSource(details) {
+    const job = new Job('download GeoSource');
 
-		return job;
-	},
-	gwcImportGeoSource: function (details) {
-		let job = new Job('import GeoSource');
+    job.invoke(createGwcDetails('download-geosource', `pyxis://${details.id}`)).complete();
 
-		job.invoke(createGwcDetails('import-geosource', 'pyxis://' + details.id)).complete();
+    return job;
+  },
+  gwcImportGeoSource(details) {
+    const job = new Job('import GeoSource');
 
-		return job;
-	},
-	gwcGalleryStatus: function (details) {
-		let job = new Job('gallery status');
+    job.invoke(createGwcDetails('import-geosource', `pyxis://${details.id}`)).complete();
 
-		job.invoke(createGwcDetails('gallery-status', details.id)).then((taskState) => {
-			serverContext.emit('geoSources', taskState.data.geoSources || []);
-		}).complete();
+    return job;
+  },
+  gwcGalleryStatus(details) {
+    const job = new Job('gallery status');
 
-		return job;
-	}
-}
+    job.invoke(createGwcDetails('gallery-status', details.id)).then((taskState) => {
+      serverContext.emit('geoSources', taskState.data.geoSources || []);
+    }).complete();
+
+    return job;
+  },
+  listNodes() {
+    /* eslint-disable no-template-curly-in-string */
+    const job = new Job('nodes');
+
+    job.forEachNode('*', {
+      name: 'info',
+      cwd: '${rootPath}',
+      exec: '${nodePath}',
+      args: ['ggs.js', 'local'],
+    }).then((results) => {
+      const deploymentsPerNode = {};
+
+      results.forEach((task) => {
+        deploymentsPerNode[task.details.node] = task.data.deployments;
+      });
+
+      serverContext.nodes.forEach((node) => {
+        /* eslint-disable no-param-reassign */
+        if (node.id in deploymentsPerNode) {
+          node.deployments = deploymentsPerNode[node.id];
+        }
+      });
+
+      serverContext.emit('nodes', serverContext.nodes);
+      return serverContext.nodes;
+    }).complete();
+
+    return job;
+  },
+  deployDeployment(details) {
+    /* eslint-disable no-template-curly-in-string */
+    const job = new Job('deployment');
+
+    job.forEachNode('*', {
+      name: 'deploy-deployment',
+      cwd: '${rootPath}',
+      exec: '${nodePath}',
+      args: ['ggs.js', 'deploy', `-d=${details.name}`, `-v=${details.version}`],
+    }).complete();
+
+    return job;
+  },
+  removeDeployment(details) {
+    /* eslint-disable no-template-curly-in-string */
+    const job = new Job('deployment');
+
+    job.forEachNode('*', {
+      name: 'remove-deployment',
+      cwd: '${rootPath}',
+      exec: '${nodePath}',
+      args: ['ggs.js', 'remove', `-d=${details.name}`, `-v=${details.version}`],
+    }).complete();
+
+    return job;
+  },
+};
 
 module.exports = Api;

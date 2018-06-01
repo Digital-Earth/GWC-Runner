@@ -8,16 +8,19 @@
 # install dependencies
 npm install
 
-# run root cluster node. by default it will start at localhost:8081. 
-npm run root
+# setup the node, this will prompt several questions for you to set things up
+node ggs setup
 
-# run slave cluster node (for task execution). by default it will connect to localhost:8081
+# run slave cluster node (for task execution).
 npm run node
-# you can run this several times to setup new nodes
-npm run node
+# you can run this several times to setup new nodes with different nodes
+npm run node --port 1234
 
-# serve with hot reload at localhost:8080. connecting by default to cluster root at localhost:8081 
+# serve with hot reload at localhost:8080 and setup a local node
 npm run dev
+
+# serve with hot reload at localhost:88080 and connect to cluster master node
+npm run ui --cluster http://localhost:4000
 
 # build for production with minification
 npm run build

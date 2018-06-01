@@ -1,385 +1,448 @@
 const clone = require('clone');
 const uuid = require('uuid/v4');
 const ee = require('event-emitter');
-const { StatusCodes , MutableState } = require('./MutableState');
+const { StatusCodes, MutableState } = require('./MutableState');
 
-let serverContext = require('./ServerContext');
+const serverContext = require('./ServerContext');
 
 class SyncPoint {
-	constructor() {
-		this._triggered = false;
-		this._value = undefined;
-		this.ee = ee();
-	}
+  constructor() {
+    this._triggered = false;
+    this._value = undefined;
+    this.ee = ee();
+  }
 
-	trigger(value) {
-		if (!this._triggered) {
-			this._triggered = true;
-			this._value = value;
-			this.ee.emit('event', value);
-		}
-	}
+  trigger(value) {
+    if (!this._triggered) {
+      this._triggered = true;
+      this._value = value;
+      this.ee.emit('event', value);
+    }
+  }
 
-	on(callback) {
-		if (this._triggered) {
-			callback(this._value);
-		} else {
-			this.ee.once('event', callback);
-		}
-	}
+  on(callback) {
+    if (this._triggered) {
+      callback(this._value);
+    } else {
+      this.ee.once('event', callback);
+    }
+  }
 }
 
 class Action {
-	constructor(job, trigger) {
-		this.job = job;
-		this.trigger = trigger;
-		this.sync = new SyncPoint();
-	}
+  constructor(job, trigger) {
+    this.job = job;
+    this.trigger = trigger;
+    this.sync = new SyncPoint();
+  }
 
-	keepAlive(task, options) {
-		options = options || {};
-		if (!options.while) {
-			options.while = function () { return true; }
-		}
-		return this.invoke(task, options);
-	}
+  keepAlive(task, options) {
+    options = options || {};
+    if (!options.while) {
+      options.while = function () { return true; };
+    }
+    return this.invoke(task, options);
+  }
 
-	invoke(task, options) {
-		if (task instanceof Job) {
-			if (options && options.while) {
-				throw "same Job instance can't be used with options.while for multiple iterations. please change into a factory function";
-			}
-			let self = this;	
-			return new PromiseAction(this.job, this.sync, function () {
-				task.parent = self.job;
-				task.start();
-				return task;
-			}, options);
-		} else if (typeof task === 'function') {
-			return new PromiseAction(this.job, this.sync, task, options);
-		} else {
-			return new TaskAction(this.job, this.sync, task, options);
-		}
-	}
+  invoke(task, options) {
+    if (task instanceof Job) {
+      if (options && options.while) {
+        throw "same Job instance can't be used with options.while for multiple iterations. please change into a factory function";
+      }
+      const self = this;
+      return new PromiseAction(this.job, this.sync, (() => {
+        task.parent = self.job;
+        task.start();
+        return task;
+      }), options);
+    } else if (typeof task === 'function') {
+      return new PromiseAction(this.job, this.sync, task, options);
+    }
+    return new TaskAction(this.job, this.sync, task, options);
+  }
 
-	then(callback) {
-		return new PromiseAction(this.job, this.sync, callback);
-	}
+  then(callback) {
+    return new PromiseAction(this.job, this.sync, callback);
+  }
 
-	complete(value) {
-		let forwardActionResult = arguments.length == 0;
-		this.sync.on((result) => this.job.complete(forwardActionResult ? result : value));
-	}
+  complete(value) {
+    const forwardActionResult = arguments.length == 0;
+    this.sync.on(result => this.job.complete(forwardActionResult ? result : value));
+  }
 
-	forEach(items, callback, options) {
-		options = options || {};
+  // nodes = '*' - all nodes
+  //       = [id,id] - for specific nodes as an array
+  //       = "id,id,id" - for specific nodes as a string
+  // task - task details. can't invoke callback on remote nodes
+  // options - task options
+  forEachNode(nodes, task, options) {
+    options = options || {};
+    if (nodes == '*') {
+      nodes = serverContext.cluster.nodes().map(node => node.id);
+    } else if (!Array.isArray(nodes)) {
+      nodes = nodes.split(',');
+    }
 
-		let parallel = options.parallel || 1;
+    const action = new Action(this.job, this.sync);
 
-		let action = new Action(this.job, this.sync);
+    action.tasks = [];
+    const results = [];
+    let completed = 0;
 
-		let self = this;
+    const self = this;
 
-		let total = items.length;
-		let index = 0;
-		let completed = 0;
+    this.then(() => {
+      action.running = true;
 
-		action.tasks = [];
-		let results = [];
+      function handleNodeConnected(node) {
+        console.log('connected', node);
+      }
 
-		function startNextTask() {
-			action.running = true;
-			while (action.tasks.length < parallel && index < items.length) {
-				let itemIndex = index;
-				index++;
+      function handleNodeDisconnected(node) {
+        console.log('disconnected', node);
+      }
 
-				let item = items[itemIndex];
+      serverContext.cluster.on('node-connected', handleNodeConnected);
+      serverContext.cluster.on('node-disconnected', handleNodeDisconnected);
 
-				let itemAction = self.then(function () {
-					return callback(item);
-				});
+      function invokeTaskOnNode(node) {
+        const taskIndex = results.length;
+        results.push(undefined);
+        const nodeTask = clone(task);
+        nodeTask.node = node;
 
-				action.tasks.push(itemAction);
+        const invokedTask = self.invoke(nodeTask, options);
 
-				itemAction.then(function (result) {
-					results[itemIndex] = result;
+        action.tasks.push(invokedTask);
+        invokedTask.then((result) => {
+          results[taskIndex] = result;
+          completed++;
+          if (completed == nodes.length) {
+            serverContext.cluster.off('node-connected', handleNodeConnected);
+            serverContext.cluster.off('node-disconnected', handleNodeDisconnected);
+            action.running = false;
+            action.result = results;
+            action.sync.trigger(results);
+          }
+        });
+      }
 
-					action.tasks.splice(action.tasks.indexOf(itemAction), 1);
-					completed++;
+      nodes.forEach(node => invokeTaskOnNode(node));
+    });
 
-					if (completed == total) {
-						action.running = false;
-						action.result = results;
-						action.sync.trigger(results);
-					} else {
-						startNextTask();
-					}
-				});
-			}
-		}
+    return action;
+  }
 
-		this.then(startNextTask);
+  forEach(items, callback, options) {
+    options = options || {};
 
-		return action;
-	}
+    const parallel = options.parallel || 1;
+
+    const action = new Action(this.job, this.sync);
+
+    const self = this;
+
+    const total = items.length;
+    let index = 0;
+    let completed = 0;
+
+    action.tasks = [];
+    const results = [];
+
+    function startNextTask() {
+      action.running = true;
+      while (action.tasks.length < parallel && index < items.length) {
+        const itemIndex = index;
+        index++;
+
+        const item = items[itemIndex];
+
+        const itemAction = self.then(() => callback(item));
+
+        action.tasks.push(itemAction);
+
+        itemAction.then((result) => {
+          results[itemIndex] = result;
+
+          action.tasks.splice(action.tasks.indexOf(itemAction), 1);
+          completed++;
+
+          if (completed == total) {
+            action.running = false;
+            action.result = results;
+            action.sync.trigger(results);
+          } else {
+            startNextTask();
+          }
+        });
+      }
+    }
+
+    this.then(startNextTask);
+
+    return action;
+  }
 }
 
 ee(Action.prototype);
 
 class PromiseAction extends Action {
-	constructor(job, trigger, callback, options) {
+  constructor(job, trigger, callback, options) {
+    super(job, trigger);
 
-		super(job, trigger);
+    options = options || {};
+    this.while = options.while || function () { return false; };
 
-		options = options || {};
-		this.while = options.while || function () { return false; };
+    const self = this;
 
-		let self = this;
+    function complete(value) {
+      if (arguments.length > 0) {
+        self.result = value;
+      }
+      if (self.while(value)) {
+        doTask(value);
+      } else {
+        self.sync.trigger(value);
+      }
+    }
 
-		function complete(value) {
-			if (arguments.length > 0) {
-				self.result = value;
-			}
-			if (self.while(value)) {
-				doTask(value);
-			} else {
-				self.sync.trigger(value)
-			}
-		}
+    function doTask(value) {
+      const result = callback(value);
 
-		function doTask(value) {
-			let result = callback(value);
+      if (result && result.sync) {
+        self.running = true;
 
-			if (result && result.sync) {
-				self.running = true;
+        // auto start a job
+        if (result instanceof Job) {
+          result.parent = self.job;
+          result.start();
+        }
 
-				//auto start a job
-				if (result instanceof Job) {
-					result.parent = self.job;
-					result.start();
-				}
-				
-				//wait until item completed
-				result.sync.on((value) => {
-					self.running = false;
-					complete(value);
-				});
-			} else {
-				complete(result);
-			}
-		};
+        // wait until item completed
+        result.sync.on((value) => {
+          self.running = false;
+          complete(value);
+        });
+      } else {
+        complete(result);
+      }
+    }
 
-		trigger.on((value) => {
-			doTask(value);
-		});
-	}
+    trigger.on((value) => {
+      doTask(value);
+    });
+  }
 }
 
 class TaskAction extends Action {
-	constructor(job, trigger, details, options) {
-		super(job, trigger);
+  constructor(job, trigger, details, options) {
+    super(job, trigger);
 
-		this.details = clone(details);
+    this.details = clone(details);
 
-		this.task = undefined;
-		this.running = false;
+    this.task = undefined;
+    this.running = false;
 
-		options = options || {};
-		this.while = options.while || function () { return false; };
+    options = options || {};
+    this.while = options.while || function () { return false; };
 
-		this.publish = options.publish;
+    this.publish = options.publish;
 
-		let self = this;
+    const self = this;
 
-		function killTask() {
-			if (self.task) {
-				serverContext.cluster.killTaskById(self.task.id);
-			}
-		}
+    function killTask() {
+      if (self.task) {
+        serverContext.cluster.killTaskById(self.task.id);
+      }
+    }
 
-		function startTask() {
-			//add job id, we need to do it now because only here the jobParent might be known.
-			self.details.details = self.details.details || {};
-			let rootJob = self.job.getRootJob();
+    function startTask() {
+      // add job id, we need to do it now because only here the jobParent might be known.
+      self.details.details = self.details.details || {};
+      const rootJob = self.job.getRootJob();
 
-			self.details.details.job = rootJob.id;
+      self.details.details.job = rootJob.id;
 
-			
-			serverContext.cluster.start(self.details, (state) => {
-				self.task = state;
-				rootJob.state.mutateData('tasks',state.id);
-				if (self.publish) {
-					rootJob.state.mutateData(self.publish.name,self.publish.value);
-				}
-				self.emit('start');
-				
-				state.on('exit', () => {
-					self.task = undefined;
-					self.result = state;
-					self.job.getRootJob().state.mutateDataDelete('tasks',state.id);
-					if (self.publish) {
-						rootJob.state.mutateDataDelete(self.publish.name,self.publish.value);
-					}
 
-					if (self.job.status == StatusCodes.cancelled) {
-						self.emit('cancelled');
-						self.running = false;
-						self.sync.trigger(self.result);
-						return;
-					} else {
-						self.emit('done');
-					}
+      serverContext.cluster.start(self.details, (state) => {
+        self.task = state;
+        rootJob.state.mutateData('tasks', state.id);
+        if (self.publish) {
+          rootJob.state.mutateData(self.publish.name, self.publish.value);
+        }
+        self.emit('start');
 
-					if (self.while(self.result)) {
-						startTask();
-					} else {
-						self.running = false;
-						self.sync.trigger(self.result);
-					}
-				});
+        state.on('exit', () => {
+          self.task = undefined;
+          self.result = state;
+          self.job.getRootJob().state.mutateDataDelete('tasks', state.id);
+          if (self.publish) {
+            rootJob.state.mutateDataDelete(self.publish.name, self.publish.value);
+          }
 
-				if (self.job.status != StatusCodes.running) {
-					killTask();
-				}
-			});
-		}
+          if (self.job.status == StatusCodes.cancelled) {
+            self.emit('cancelled');
+            self.running = false;
+            self.sync.trigger(self.result);
+            return;
+          }
+          self.emit('done');
 
-		this.trigger.on(() => {
-			if (self.job.status == StatusCodes.cancelled) {
-				self.emit('cancelled');
-				self.sync.trigger();
-				return;
-			}
 
-			this.running = true;
+          if (self.while(self.result)) {
+            startTask();
+          } else {
+            self.running = false;
+            self.sync.trigger(self.result);
+          }
+        });
 
-			startTask();
-		});
+        if (self.job.status != StatusCodes.running) {
+          killTask();
+        }
+      });
+    }
 
-		this.job.on('cancelled', () => {
-			killTask();
-			self.emit('cancelled');
-		});
-	}
+    this.trigger.on(() => {
+      if (self.job.status == StatusCodes.cancelled) {
+        self.emit('cancelled');
+        self.sync.trigger();
+        return;
+      }
+
+      this.running = true;
+
+      startTask();
+    });
+
+    this.job.on('cancelled', () => {
+      killTask();
+      self.emit('cancelled');
+    });
+  }
 }
 
 class Job {
-	constructor(name) {
-		this.parent = null;
-		this.id = uuid();
-		this.name = name || this.id;
-		
-		this.state = new MutableState({
-			id: this.id,
-			name: this.name,
-			status: StatusCodes.new
-		});
-		
-		//start point
-		this.root = new Action(this, null);
+  constructor(name) {
+    this.parent = null;
+    this.id = uuid();
+    this.name = name || this.id;
 
-		//complete point
-		this.sync = new SyncPoint();
-	}
+    this.state = new MutableState({
+      id: this.id,
+      name: this.name,
+      status: StatusCodes.new,
+    });
 
-	get status() {
-		return this.state.status;
-	}
+    // start point
+    this.root = new Action(this, null);
 
-	set status(value) {
-		this.state.mutateStatus(value);
-	}
+    // complete point
+    this.sync = new SyncPoint();
+  }
 
-	getRootJob() {
-		if (this.parent) {
-			return this.parent.getRootJob();
-		}
-		return this;
-	}
+  get status() {
+    return this.state.status;
+  }
 
-	start() {
-		if (this.status == StatusCodes.new || this.status == StatusCodes.stopped) {
-			this.status = StatusCodes.running;
-			this.emit('start');
-			this.root.sync.trigger();
-		}
-	}
+  set status(value) {
+    this.state.mutateStatus(value);
+  }
 
-	kill() {
-		if (this.status == StatusCodes.new || this.status == StatusCodes.running || this.status.StatusCodes.stopped) {
-			this.status = StatusCodes.cancelled;
-			this.emit('cancelled');
-			this.root.sync.trigger();
-		}
-	}
+  getRootJob() {
+    if (this.parent) {
+      return this.parent.getRootJob();
+    }
+    return this;
+  }
 
-	complete(value) {
-		if (this.status == StatusCodes.new || this.status == StatusCodes.running) {
-			this.result = value;
-			this.status = StatusCodes.done;
-			this.sync.trigger(value);
-			this.emit('done');
-		}
-	}
+  start() {
+    if (this.status == StatusCodes.new || this.status == StatusCodes.stopped) {
+      this.status = StatusCodes.running;
+      this.emit('start');
+      this.root.sync.trigger();
+    }
+  }
 
-	keepAlive(task, options) {
-		return this.root.keepAlive(task, options);
-	}
+  kill() {
+    if (this.status == StatusCodes.new || this.status == StatusCodes.running || this.status.StatusCodes.stopped) {
+      this.status = StatusCodes.cancelled;
+      this.emit('cancelled');
+      this.root.sync.trigger();
+    }
+  }
 
-	invoke(task, options) {
-		return this.root.invoke(task, options)
-	}
+  complete(value) {
+    if (this.status == StatusCodes.new || this.status == StatusCodes.running) {
+      this.result = value;
+      this.status = StatusCodes.done;
+      this.sync.trigger(value);
+      this.emit('done');
+    }
+  }
 
-	forEach(items, callback, options) {
-		return this.root.forEach(items, callback, options);
-	}
+  keepAlive(task, options) {
+    return this.root.keepAlive(task, options);
+  }
 
-	whenAll(...actions) {
-		let count = 0;
-		let action = new Action(this, this.root.sync);
-		action.actions = actions;
+  invoke(task, options) {
+    return this.root.invoke(task, options);
+  }
 
-		for (let a of actions) {
-			a.sync.on(function (result) {
-				count++;
-				if (count == actions.length) {
-					action.result = actions.map(aa => aa.result);
-					action.sync.trigger(action.result);
-				}
-			});
-		}
+  forEach(items, callback, options) {
+    return this.root.forEach(items, callback, options);
+  }
 
-		return action;
-	}
+  forEachNode(nodes, task, options) {
+    return this.root.forEachNode(nodes, task, options);
+  }
 
-	whenFirst(...actions) {
-		let action = new Action(this, this.root.sync);
-		action.actions = actions;
+  whenAll(...actions) {
+    let count = 0;
+    const action = new Action(this, this.root.sync);
+    action.actions = actions;
 
-		for (let a of actions) {
-			a.sync.on(function (result) {
-				//TODO: not overwrite the action result when second task is been called
-				action.result = result;
-				action.sync.trigger(result);
-			});
-		}
+    for (const a of actions) {
+      a.sync.on((result) => {
+        count++;
+        if (count == actions.length) {
+          action.result = actions.map(aa => aa.result);
+          action.sync.trigger(action.result);
+        }
+      });
+    }
 
-		return action;
-	}
+    return action;
+  }
+
+  whenFirst(...actions) {
+    const action = new Action(this, this.root.sync);
+    action.actions = actions;
+
+    for (const a of actions) {
+      a.sync.on((result) => {
+        // TODO: not overwrite the action result when second task is been called
+        action.result = result;
+        action.sync.trigger(result);
+      });
+    }
+
+    return action;
+  }
 }
 
 ee(Job.prototype);
 
 
 /**
- * 
+ *
  * let job = new Job("gwc");
- * 
+ *
  * job.keepAlive({gwc});
- * 
- * 
+ *
+ *
  * let job = new Job("discoverAndValidate");
- * 
+ *
  * job	.invoke({list})
  * 		.invoke({discover})
  * 		.invoke({validate}, {while: (state) => state.state.datasets > 0 })
@@ -389,28 +452,30 @@ ee(Job.prototype);
  * 	 		}
  * 		})
  * 		.complete();
- * 
+ *
+ * job	.invoke({cleanup, node: id}) //to invoke cleanup job on a specific node
+ * 		.invoke({cleanup, node: '*'}) //to invoke cleanup job on all nodes
+ *
  * TODO:
  * job = new Job("lb");
- * 
+ *
  * action = job.keepAlive({lb}, {instancePerNode:1});
  *
  * //publish a value while task is running can be done using the publish
  * for (number of servers) {
  * 		job	.keepAlive({gwc}, {'publish':{'name':server','value':number}});
  * }
- * 
+ *
  * //this will allow you to query which tasks are running
  * job.state.data['server'] = [1,2,3]
- * 
+ *
  * options:
  *    instances: number
  *    instancesPerNode: number
  *    nodes: { filters }
  *    name: set as named actions
- *    while: function for rerunning 
+ *    while: function for rerunning
  */
 
 
-
-module.exports = Job
+module.exports = Job;

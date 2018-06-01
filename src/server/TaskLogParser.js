@@ -1,59 +1,57 @@
-var extend = require('extend');
+const extend = require('extend');
 
 class TaskLogParser {
+  constructor(options) {
+    const defaults = {
+      commands: {
+        UPDATE(task, key, value) {
+          task.state.mutateState(key, value);
+        },
+        PUSH(task, key, value) {
+          task.state.mutateData(key, value);
+        },
+        POP(task, key, value) {
+          task.state.mutateDataDelete(key, value);
+        },
+        ENDPOINT(task, key, value) {
+          task.state.mutateEndpoints(key, value);
+        },
+      },
+      logSize: 10,
+    };
 
-	constructor(options) {
-		var defaults = {
-			commands: {
-				'UPDATE': function (task, key, value) {
-					task.state.mutateState(key,value);
-				},
-				'PUSH': function (task, key, value) {
-					task.state.mutateData(key, value);
-				},
-				'POP': function (task, key, value) {
-					task.state.mutateDataDelete(key, value);
-				},
-				'ENDPOINT': function (task, key, value) {
-					task.state.mutateEndpoints(key, value);
-				}
-			},
-			logSize: 10,
-		}
+    options = extend({}, defaults, options);
+    this.commands = options.commands;
+    this.logSize = options.logSize;
+    this.logTail = [];
+  }
 
-		options = extend({}, defaults, options);
-		this.commands = options.commands;
-		this.logSize = options.logSize;
-		this.logTail = [];
-	}
+  parseLine(task, line) {
+    const groups = line.match(/\*\*\* (\w+) \*\*\*\s*([^\s\=]+)\s*\=(.*)/);
+    if (groups) {
+      const command = groups[1].trim();
+      const key = groups[2].trim();
+      let value = groups[3].trim();
+      try {
+        value = JSON.parse(value);
+      } catch (error) {
+        value = error;
+      }
 
-	parseLine(task, line) {
-		var groups = line.match(/\*\*\* (\w+) \*\*\*\s*([^\s\=]+)\s*\=(.*)/);
-		if (groups) {
+      if (command in this.commands) {
+        this.commands[command](task, key, value);
+        return;
+      }
+    }
 
-			var command = groups[1].trim();
-			var key = groups[2].trim();
-			var value = groups[3].trim();
-			try {
-				value = JSON.parse(value);
-			} catch (error) {
-				value = error;
-			}
+    // record line
+    task.state.mutateLog(line);
 
-			if (command in this.commands) {
-				this.commands[command](task, key, value);
-				return;
-			}
-		}
-		
-		//record line
-		task.state.mutateLog(line);
-
-		this.logTail.push(line);
-		if (this.logTail.length > this.logSize) {
-			this.logTail.shift();
-		}
-	}
+    this.logTail.push(line);
+    if (this.logTail.length > this.logSize) {
+      this.logTail.shift();
+    }
+  }
 }
 
-module.exports = TaskLogParser
+module.exports = TaskLogParser;

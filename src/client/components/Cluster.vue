@@ -8,6 +8,7 @@
 		<div class="job-info" v-for="job in state.jobs" v-bind:key="job.id">
 			<div class="job-header" v-bind:class="{ running: job.status == 'running'}">
 				{{job.name}} - {{job.id}}
+				<button class="close" @click.stop="killJob(job)">X</button>
 			</div>
 
 			<div class="inside">
@@ -15,11 +16,6 @@
 			</div>
 		</div>
 
-		<h2 class="space">Tasks
-			
-		</h2>
-
-		
 	</div>
 </template>
 
@@ -76,6 +72,19 @@ export default {
 			} else {
 				//send kill command
 				this.$socket.emit('kill-task',taskToRemove.id);
+			} 
+		},
+		killJob(jobToRemove) {
+			if (jobToRemove.status == 'running') {
+				this.$socket.emit('kill-job',jobToRemove.id);
+			} else {
+				for(var i=0;i<this.state.jobs.length;i++) {
+					var job = this.state.jobs[i];
+					if (job.id === jobToRemove.id) {
+						this.state.jobs.splice(i,1);
+						return;
+					}
+				}
 			}
 		}
 	},
@@ -114,4 +123,16 @@ export default {
 	background-color: #32a323;
 }
 
+.job-info .job-header button.close {
+	position: absolute;
+    right: 10px;
+    top: 10px;
+	transition: all 0.2s ease-in-out;
+	border: 1px solid transparent;
+	padding: 0px 10px;
+} 
+
+.job-info .job-header:hover button.close {
+	border: 1px solid #888;
+}
 </style>

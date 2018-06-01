@@ -4,181 +4,195 @@ const fs = require('fs');
 const processUsage = require('pidusage');
 const TaskLogParser = require('./TaskLogParser');
 const { MutableState, StatusCodes } = require('./MutableState');
+const es6template = require('es6-template');
 
 class Task {
-	constructor(options) {
-		let defaults = {
-			id: undefined,
+  constructor(options) {
+    const defaults = {
+      id: undefined,
 
-			name: undefined,
+      name: undefined,
 
-			//default cwd of the process
-			cwd: process.cwd(),
+      // default cwd of the process
+      cwd: process.cwd(),
 
-			//can be used to send the process a kill command through stdin. for example, GeoWebCore expect 'x' to exit
-			killCommand: undefined,
+      // can be used to send the process a kill command through stdin. for example, GeoWebCore expect 'x' to exit
+      killCommand: undefined,
 
-			//how long to wait until the kill command take affect
-			killCommandTimeout: 30 * 1000,
+      // how long to wait until the kill command take affect
+      killCommandTimeout: 30 * 1000,
 
-			//how quickly to update the CPU/Memory load
-			usageRefreshRate: 5 * 1000,
+      // how quickly to update the CPU/Memory load
+      usageRefreshRate: 5 * 1000,
 
-			//default state is empty
-			state: {},
+      // default state is empty
+      state: {},
 
-			//default data is empty
-			data: {},
+      // default data is empty
+      data: {},
 
-			details: {},
+      details: {},
 
-			//log parser, that go over every line
-			//default log parser look for '*** [COMMAND] *** key=value'
-			logParser: new TaskLogParser(),
-		}
+      // log parser, that go over every line
+      // default log parser look for '*** [COMMAND] *** key=value'
+      logParser: new TaskLogParser(),
+    };
 
-		options = extend({}, defaults, options);
+    options = extend({}, defaults, options);
 
-		this.state = new MutableState({
-			id: options.id,
-			name: options.name,
-			status: StatusCodes.new,
-			state: options.state,
-			data: options.data,
-			details: options.details,
-			endpoints: options.endpoints
-		});
+    this.state = new MutableState({
+      id: options.id,
+      name: options.name,
+      status: StatusCodes.new,
+      state: options.state,
+      data: options.data,
+      details: options.details,
+      endpoints: options.endpoints,
+    });
 
-		this.cwd = options.cwd;
-		this.exec = options.exec;
-		this.args = options.args;
+    this.cwd = options.cwd;
+    this.exec = options.exec;
+    this.args = options.args;
+    this.env = options.env;
 
-		this.killCommand = options.killCommand;
-		this.killCommandTimeout = options.killCommandTimeout;
-		this.usageRefreshRate = options.usageRefreshRate;
+    this.killCommand = options.killCommand;
+    this.killCommandTimeout = options.killCommandTimeout;
+    this.usageRefreshRate = options.usageRefreshRate;
 
-		this.logFile = options.logFile;
-		this.logParser = options.logParser;
+    this.logFile = options.logFile;
+    this.logParser = options.logParser;
+  }
 
-		if (this.logFile) {
-			this.logStream = fs.createWriteStream(this.logFile);
-		}
-	}
+  start() {
+    if (this.childProcess) {
+      return;
+    }
 
-	start() {
-		if (this.childProcess) {
-			return;
-		}
+    // use env to extend the vairables like path and appdata required for apps to run correctly
+    const env = extend({}, process.env, this.env);
 
-		let self = this;
-		let child = this.childProcess = spawn(this.exec, this.args, {
-			cwd: this.cwd
-		});
+    const self = this;
+    const child = this.childProcess = spawn(this.exec, this.args, {
+      cwd: this.cwd,
+      env,
+    });
 
-		var stdout = '';
+    if (this.logFile) {
+      let time = new Date().toISOString(); // = '2018-05-25T16:54:05.245Z'
+      time = time.replace(/[\-\:]/g, '-').replace('T', '.').substr(0, 19); // = '2018-05-25.16-54-05'
 
-		function parseLine(line) {
-			if (line) {
-				self.logParser.parseLine(self, line);
-			}
-		}
+      this.logFile = es6template(this.logFile, {
+        name: this.state.name,
+        id: this.state.id,
+        pid: child.pid,
+        time,
+      });
+      this.logStream = fs.createWriteStream(this.logFile);
+    }
 
-		child.stdout.on('data', function (data) {
-			if (self.logStream) {
-				self.logStream.write(data);
-			}
+    let stdout = '';
 
-			stdout += data.toString();
+    function parseLine(line) {
+      if (line) {
+        self.logParser.parseLine(self, line);
+      }
+    }
 
-			//emit all lines
-			while (stdout.indexOf('\n') != -1) {
-				var pos = stdout.indexOf('\n');
-				var line = stdout.substr(0, pos);
-				stdout = stdout.substr(pos + 1);
-				parseLine(line);
-			}
-		});
+    child.stdout.on('data', (data) => {
+      if (self.logStream) {
+        self.logStream.write(data);
+      }
 
-		child.stderr.on('data', function (data) {
-			if (self.logStream) {
-				self.logStream.write(data);
-			}
-		});
+      stdout += data.toString();
 
-		child.on('close', function (code) {
-			//emit the last line
-			parseLine(stdout);
+      // emit all lines
+      while (stdout.indexOf('\n') != -1) {
+        const pos = stdout.indexOf('\n');
+        const line = stdout.substr(0, pos);
+        stdout = stdout.substr(pos + 1);
+        parseLine(line);
+      }
+    });
 
-			self.state.mutateState('endTime', new Date());
-			self.state.mutateState('exitCode', code);
-			self.state.mutateStatus(StatusCodes.done);
+    child.stderr.on('data', (data) => {
+      if (self.logStream) {
+        self.logStream.write(data);
+      }
+    });
 
-			if (self.updateUsageTimeoutId) {
-				clearTimeout(self.updateUsageTimeoutId);
-			}
-			processUsage.unmonitor(self.pid)
-		});
+    child.on('close', (code) => {
+      // emit the last line
+      parseLine(stdout);
 
-		child.on('error', function (error) {
+      self.state.mutateState('endTime', new Date());
+      self.state.mutateState('exitCode', code);
+      self.state.mutateStatus(StatusCodes.done);
 
-			self.state.mutateState('error', error);
-			self.state.mutateStatus(StatusCodes.error);
-		});
+      if (self.updateUsageTimeoutId) {
+        clearTimeout(self.updateUsageTimeoutId);
+      }
+      processUsage.unmonitor(self.pid);
+    });
 
-		this.pid = child.pid;
+    child.on('error', (error) => {
+      self.state.mutateState('error', error);
+      self.state.mutateStatus(StatusCodes.error);
+    });
 
-		self.state.mutateStatus(StatusCodes.running);
-		self.state.mutateState('startTime', new Date());
-		self.state.mutateState('pid', this.pid);
-		self.state.mutateUsage({ cpu: 0, memory: 0 });
+    this.pid = child.pid;
 
-		this.updateUsage();
-	}
+    self.state.mutateStatus(StatusCodes.running);
+    self.state.mutateState('startTime', new Date());
+    self.state.mutateState('pid', this.pid);
+    self.state.mutateUsage({ cpu: 0, memory: 0 });
 
-	updateUsage() {
-		if (this.state.status === StatusCodes.running) {
-			var self = this;
-			processUsage.stat(this.pid, function (err, usage) {
-				if (!err) {
-					let newUsage = extend({}, self.state.usage, usage);
+    this.updateUsage();
+  }
 
-					//measure idle item
-					if (newUsage.cpu < 1) {
-						newUsage.idleFrom = newUsage.idleFrom || new Date();
-					} else {
-						delete newUsage.idleFrom;
-					}
+  updateUsage() {
+    if (this.state.status === StatusCodes.running) {
+      const self = this;
+      processUsage.stat(this.pid, (err, usage) => {
+        if (!err) {
+          const newUsage = extend({}, self.state.usage, usage);
 
-					self.state.mutateUsage(newUsage);
-				}
+          // measure idle item
+          if (newUsage.cpu < 1) {
+            newUsage.idleFrom = newUsage.idleFrom || new Date();
+          } else {
+            delete newUsage.idleFrom;
+          }
 
-				//register another check
-				self.updateUsageTimeoutId = setTimeout(function () { self.updateUsage(); }, self.usageRefreshRate);
-			});
-		}
-	}
+          self.state.mutateUsage(newUsage);
+        }
 
-	kill() {
-		if (this.state.status === StatusCodes.terminating || this.state.status === StatusCodes.done || this.state.status === StatusCodes.error) {
-			return;
-		}
+        // register another check
+        self.updateUsageTimeoutId = setTimeout(() => { self.updateUsage(); }, self.usageRefreshRate);
+      });
+    }
+  }
 
-		this.state.mutateStatus(StatusCodes.terminating);
+  kill() {
+    if (this.state.status === StatusCodes.terminating || this.state.status === StatusCodes.done || this.state.status === StatusCodes.error) {
+      return;
+    }
 
-		if (this.killCommand) {
-			var self = this;
-			this.childProcess.stdin.write(this.killCommand + '\n');
-			setTimeout(function () { self.forceKill(); }, this.killCommandTimeout);
-		} else {
-			this.forceKill();
-		}
-	}
+    this.state.mutateStatus(StatusCodes.terminating);
 
-	forceKill() {
-		if (this.state.status !== StatusCodes.done && !this.childProcess.killed) {
-			this.childProcess.kill();
-		}
-	}
+    if (this.killCommand) {
+      const self = this;
+      this.childProcess.stdin.write(`${this.killCommand}\n`);
+      setTimeout(() => { self.forceKill(); }, this.killCommandTimeout);
+    } else {
+      this.forceKill();
+    }
+  }
+
+  forceKill() {
+    if (this.state.status !== StatusCodes.done && !this.childProcess.killed) {
+      this.childProcess.kill();
+    }
+  }
 }
 
 module.exports = Task;

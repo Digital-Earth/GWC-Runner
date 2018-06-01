@@ -1,28 +1,33 @@
-let Service = require('node-windows').Service;
+import { Service } from 'node-windows';
 
-// Create a new service object
-let svc = new Service({
-  name:'GGS Node Cluster',
-  description: 'Global Grid Node server.',
-  script: process.cwd() + '\\src\\node.js',
-});
+module.exports = () => {
+  // Create a new service object
+  const svc = new Service({
+    name: 'GGS Node Cluster',
+    description: 'Global Grid Node server.',
+    script: `${process.cwd()}\\src\\node.js`,
+  });
 
-// Listen for the "install" event, which indicates the
-// process is available as a service.
-svc.on('install',function(){
-  svc.start();
-});
+  // Listen for the "install" event, which indicates the
+  // process is available as a service.
+  svc.on('install', () => {
+    svc.start();
+  });
 
 
-switch (process.argv[2]) {
-	case 'install':
-		svc.install();
-		break;
+  switch (process.argv[3]) {
+    case 'install':
+      svc.install();
+      break;
 
-	case 'uninstall':
-		svc.uninstall();
-		break;
+    case 'uninstall':
+      svc.uninstall();
+      break;
 
-	default:
-		console.log('available commands: install uninstall')
-}
+    default:
+      console.log(`
+available commands:
+  node ggs service install 
+  node ggs service uninstall`);
+  }
+};

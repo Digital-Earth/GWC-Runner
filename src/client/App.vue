@@ -42,9 +42,10 @@ export default {
       nav: true,
       items: [
         { title: "Home", icon: "home", href: "/" },
-        { title: "Cluster", icon: "playlist_play", href: "/cluster" },
         { title: "DataSets", icon: "link", href: "/datasets" },
-        { title: "GeoSources", icon: "folder", href: "/geosources"}
+        { title: "GeoSources", icon: "folder", href: "/geosources"},
+        { title: "Deployments", icon: "cloud_download", href: "/deployments"},
+        { title: "Jobs", icon: "playlist_play", href: "/jobs" }
       ]
     };
   },
@@ -59,7 +60,7 @@ export default {
   },
   methods: {
     displayCount(item) {
-      if (item.title == "Cluster") {
+      if (item.title == "Jobs") {
         return this.runningTasks;
       } else {
         return "";

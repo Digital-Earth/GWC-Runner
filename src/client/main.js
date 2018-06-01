@@ -8,6 +8,7 @@ import Home from './components/Home.vue';
 import Cluster from './components/Cluster.vue';
 import DataSets from './components/DataSets.vue';
 import GeoSources from './components/GeoSources.vue';
+import Deployments from './components/Deployments.vue';
 
 import 'vuetify/dist/vuetify.css';
 
@@ -16,22 +17,23 @@ Vue.use(Vuetify);
 Vue.use(SocketService);
 
 const routes = [
-	{ path: '/', component: Home },
-	{ path: '/cluster', component: Cluster },
-	{ path: '/datasets', component: DataSets },
-	{ path: '/geosources', component: GeoSources }
+  { path: '/', component: Home },
+  { path: '/jobs', component: Cluster },
+  { path: '/datasets', component: DataSets },
+  { path: '/geosources', component: GeoSources },
+  { path: '/deployments', component: Deployments },
 ];
 
 
 const router = new VueRouter({
-	routes
+  routes,
 });
 
 
 new Vue({
-	el: '#app',
-	router,
-	template: '<app/>',
-	components: { App }
-})
+  el: '#app',
+  router,
+  template: '<app/>',
+  components: { App },
+});
 
