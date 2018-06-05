@@ -9,10 +9,12 @@ const StatusCodes = {
   done: 'done',
   error: 'error',
   cancelled: 'cancelled',
+  lost: 'lost',
 };
 
 class MutableState {
   constructor(state) {
+    // eslint-disable-next-line no-param-reassign
     state = state || {};
     this.id = state.id || uuid();
     this.name = state.name || this.id;
@@ -27,7 +29,8 @@ class MutableState {
     // usage is updated every X seconds and measure cpu and memory usage, plus idle indication
     this.usage = clone(state.usage) || {};
 
-    // data is an object of lists that can accumulate data items. good for aggregate results from tasks.
+    // data is an object of lists that can accumulate data items.
+    // good for aggregate results from tasks.
     this.data = clone(state.data) || {};
 
     // endpoints allow tasks to publish access information to the task
@@ -61,6 +64,7 @@ class MutableState {
 
       case 'endpoints':
         this.mutateEndpoints(update.key, update.value);
+        break;
 
       case 'log':
         this.mutateLog(update.value);
@@ -84,9 +88,15 @@ class MutableState {
         case StatusCodes.running:
           this.emit('start', this);
           break;
+
         case StatusCodes.done:
         case StatusCodes.error:
+        case StatusCodes.lost:
           this.emit('exit', this);
+          break;
+
+        default:
+          // do nothing
           break;
       }
     }

@@ -83,19 +83,18 @@ export default {
     });
 
     function updateRunningServices() {
-      store.state.services.gwc = false;
-      store.state.services.proxy = false;
+      store.state.deploymentRunning = false;
+      let deploymentId = '';
+      if (store.state.deployment) {
+        deploymentId = `${store.state.deployment.name}:${store.state.deployment.version}`;
+      }
       store.state.jobTasks = {};
       const jobNames = {};
       store.state.jobs.forEach((job) => {
         jobNames[job.id] = job.name;
         if (job.status === 'running') {
-          if (job.name == 'gwc') {
-            store.state.services.gwc = true;
-          }
-
-          if (job.name == 'proxy') {
-            store.state.services.proxy = true;
+          if (job.id === deploymentId) {
+            store.state.deploymentRunning = true;
           }
         }
         store.state.jobTasks[job.id] = [];

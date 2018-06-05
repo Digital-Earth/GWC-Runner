@@ -5,7 +5,7 @@ const config = require('./config');
 const serverContext = require('./ServerContext');
 const TaskResolver = require('./TaskResolver');
 const Job = require('./Job');
-
+const DeploymentJob = require('./DeploymentJob');
 const { ClusterTaskManager, LocalTaskManager, RemoteTaskManager } = require('./TaskManager');
 
 const createGwcDetails = require('./jobs/gwc');
@@ -229,20 +229,12 @@ Api.attach = (server, app) => {
       job.start();
     });
 
-    socket.on('start-proxy', () => {
-      Api.startProxy();
+    socket.on('start-deployment', () => {
+      Api.startDeployment();
     });
 
-    socket.on('stop-proxy', () => {
-      Api.stopProxy();
-    });
-
-    socket.on('start-gwc', () => {
-      Api.startGwc();
-    });
-
-    socket.on('stop-gwc', () => {
-      Api.stopGwc();
+    socket.on('stop-deployment', () => {
+      Api.stopDeployment();
     });
 
     /* BEGIN - ALL LEGACY STUFF - CONSIDER REFACTOR */
@@ -309,24 +301,14 @@ Api.attach = (server, app) => {
   });
 };
 
-Api.startGwc = () => {
-  Api.gwcJob = Api.jobs.gwc();
-  Api.trackJob(Api.gwcJob);
-  Api.gwcJob.start();
+Api.startDeployment = (deployment) => {
+  Api.deploymentJob = Api.jobs.runDeployment(deployment || Api.activeDeployment);
+  Api.trackJob(Api.deploymentJob);
+  Api.deploymentJob.start();
 };
 
-Api.stopGwc = () => {
-  Api.gwcJob.kill();
-};
-
-Api.startProxy = () => {
-  Api.proxyJob = Api.jobs.proxy({ url: 'http://localhost:1337' });
-  Api.trackJob(Api.proxyJob);
-  Api.proxyJob.start();
-};
-
-Api.stopProxy = function () {
-  Api.proxyJob.kill();
+Api.stopDeployment = () => {
+  Api.deploymentJob.kill();
 };
 
 Api.jobs = {
@@ -506,54 +488,6 @@ Api.jobs = {
 
     return job;
   },
-  proxy() {
-    const job = new Job('proxy');
-
-    job.forEachNode('*', {
-      name: 'proxy',
-      service: 'proxy',
-      deployment: Api.activeDeployment,
-      state: {
-        type: 'proxy',
-      },
-    }, { while: () => true });
-
-    return job;
-  },
-  gwc(/* details */) {
-    const job = new Job('gwc');
-
-    // ['master', 'server', 'import', 'search'].forEach(function (type) {
-    //  config.gwc[type + 'Ports'].forEach(function (port, index) {
-    //    let details = createGwcDetails(type, index);
-    //    job.keepAlive(details);
-    //  })
-    // });
-
-    job.forEachNode('*', {
-      name: 'gwc',
-      service: 'gwc',
-      deployment: Api.activeDeployment,
-      state: {
-        type: 'server',
-      },
-    }, {
-      while: () => true,
-    });
-
-    job.forEachNode('*', {
-      name: 'gwc',
-      service: 'gwc',
-      deployment: Api.activeDeployment,
-      state: {
-        type: 'server',
-      },
-    }, {
-      while: () => true,
-    });
-
-    return job;
-  },
   gwcDownloadGeoSource(details) {
     const job = new Job('download GeoSource');
 
@@ -631,6 +565,9 @@ Api.jobs = {
     }).complete();
 
     return job;
+  },
+  runDeployment(deployment) {
+    return DeploymentJob(deployment);
   },
 };
 

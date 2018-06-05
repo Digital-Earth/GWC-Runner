@@ -6,6 +6,10 @@ const TaskLogParser = require('./TaskLogParser');
 const { MutableState, StatusCodes } = require('./MutableState');
 const es6template = require('es6-template');
 
+const statusToKill = {
+  [StatusCodes.running]: true,
+};
+
 class Task {
   constructor(options) {
     const defaults = {
@@ -16,7 +20,8 @@ class Task {
       // default cwd of the process
       cwd: process.cwd(),
 
-      // can be used to send the process a kill command through stdin. for example, GeoWebCore expect 'x' to exit
+      // can be used to send the process a kill command through stdin.
+      // for example, GeoWebCore expect 'x' to exit
       killCommand: undefined,
 
       // how long to wait until the kill command take affect
@@ -38,6 +43,7 @@ class Task {
       logParser: new TaskLogParser(),
     };
 
+    // eslint-disable-next-line no-param-reassign
     options = extend({}, defaults, options);
 
     this.state = new MutableState({
@@ -72,14 +78,15 @@ class Task {
     const env = extend({}, process.env, this.env);
 
     const self = this;
-    const child = this.childProcess = spawn(this.exec, this.args, {
+    const child = spawn(this.exec, this.args, {
       cwd: this.cwd,
       env,
     });
+    this.childProcess = child;
 
     if (this.logFile) {
       let time = new Date().toISOString(); // = '2018-05-25T16:54:05.245Z'
-      time = time.replace(/[\-\:]/g, '-').replace('T', '.').substr(0, 19); // = '2018-05-25.16-54-05'
+      time = time.replace(/[-:]/g, '-').replace('T', '.').substr(0, 19); // = '2018-05-25.16-54-05'
 
       this.logFile = es6template(this.logFile, {
         name: this.state.name,
@@ -106,7 +113,7 @@ class Task {
       stdout += data.toString();
 
       // emit all lines
-      while (stdout.indexOf('\n') != -1) {
+      while (stdout.indexOf('\n') !== -1) {
         const pos = stdout.indexOf('\n');
         const line = stdout.substr(0, pos);
         stdout = stdout.substr(pos + 1);
@@ -167,13 +174,15 @@ class Task {
         }
 
         // register another check
-        self.updateUsageTimeoutId = setTimeout(() => { self.updateUsage(); }, self.usageRefreshRate);
+        self.updateUsageTimeoutId = setTimeout(() => {
+          self.updateUsage();
+        }, self.usageRefreshRate);
       });
     }
   }
 
   kill() {
-    if (this.state.status === StatusCodes.terminating || this.state.status === StatusCodes.done || this.state.status === StatusCodes.error) {
+    if (!statusToKill[this.state.status]) {
       return;
     }
 

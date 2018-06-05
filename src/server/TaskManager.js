@@ -1,7 +1,7 @@
 const uuid = require('uuid/v4');
 const clone = require('clone');
 const extend = require('extend');
-const { MutableState } = require('./MutableState');
+const { MutableState, StatusCodes } = require('./MutableState');
 const Task = require('./Task');
 
 const ee = require('event-emitter');
@@ -178,7 +178,6 @@ class RemoteTaskManager {
     this.node = node;
     this._tasks = [];
     this._nodes = [];
-    this.completedTasks = [];
     this._tasksLookup = {};
 
     this._startRequests = {};
@@ -188,13 +187,24 @@ class RemoteTaskManager {
 
       this.node.on('connect', () => {
         self.connected = true;
+
+        self.node.emit('setup', {
+          tasks: self.tasks(),
+          nodes: self.nodes(),
+        });
       });
 
       this.node.on('disconnect', () => {
         self.connected = false;
 
-        // TODO: kill all tasks or remote task as orphane
+        // report all active task has ended
+        for (const task of this._tasks) {
+          self.emit('task-end', task);
+        }
+        self._tasks = [];
+        this._tasksLookup = [];
 
+        // report all node as disconnected
         for (const nodeDetails of this._nodes) {
           self.emit('node-disconnected', nodeDetails);
         }
@@ -207,10 +217,18 @@ class RemoteTaskManager {
         self._tasks.forEach((task) => { self._tasksLookup[task.id] = task; });
         self._nodes = details.nodes;
 
+        if (self.connected) {
+          self.node.emit('setup', {
+            tasks: self.tasks(),
+            nodes: self.nodes(),
+          });
+        }
+
         self.emit('ready');
       });
 
       this.node.on('new-task', (task) => {
+        console.log(`remote task ${task.id} started on node ${task.details.node}`);
         const state = new MutableState(task);
         self._tasksLookup[state.id] = state;
         self._tasks.push(state);
@@ -233,10 +251,12 @@ class RemoteTaskManager {
           }
           delete self._tasksLookup[id];
 
-          self.completedTasks.push(state);
-          if (self.completedTasks.length > 10) {
-            self.completedTasks.shift();
+          // change task state to be lost before we kill it
+          if (state.status === StatusCodes.running) {
+            state.mutateStatus(StatusCodes.lost);
           }
+
+          console.log(`remote task ${state.id} ${state.status} on node ${state.details.node}`);
 
           self.emit('task-end', state);
         }
@@ -452,7 +472,8 @@ class ClusterTaskManager {
     });
 
     self.on('task-end', (task) => {
-      io.emit('task-end', task);
+      // over the wire we only send the id
+      io.emit('task-end', task.id);
     });
 
     self.on('mutate', (task, update) => {

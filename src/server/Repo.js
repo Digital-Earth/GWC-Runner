@@ -2,15 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const azure = require('azure-storage');
 const tar = require('tar');
-
-function ensureDirectoryExists(directory) {
-  if (fs.existsSync(directory)) {
-    return;
-  }
-  const parent = path.dirname(directory);
-  ensureDirectoryExists(parent);
-  fs.mkdirSync(directory);
-}
+const { ensureDirectoryExists } = require('../utils');
 
 class Repo {
   constructor(config) {

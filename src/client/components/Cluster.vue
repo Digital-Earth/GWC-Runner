@@ -61,7 +61,7 @@ export default {
 			store.clearAllDone();
 		},
 		removeTask(taskToRemove) {
-			if (taskToRemove.status == 'done') {							
+			if (taskToRemove.status == 'done' || taskToRemove.status == 'lost')  {							
 				for(var i=0;i<this.state.tasks.length;i++) {
 					var task = this.state.tasks[i];
 					if (task.id === taskToRemove.id) {

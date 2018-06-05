@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const ee = require('event-emitter');
 
 const context = {

@@ -1,4 +1,5 @@
 const clone = require('clone');
+const extend = require('extend');
 const uuid = require('uuid/v4');
 const ee = require('event-emitter');
 const { StatusCodes, MutableState } = require('./MutableState');
@@ -37,8 +38,10 @@ class Action {
   }
 
   keepAlive(task, options) {
-    options = options || {};
+    // eslint-disable-next-line no-param-reassign
+    options = extend({}, options);
     if (!options.while) {
+      // eslint-disable-next-line no-param-reassign
       options.while = function () { return true; };
     }
     return this.invoke(task, options);
@@ -76,10 +79,13 @@ class Action {
   // task - task details. can't invoke callback on remote nodes
   // options - task options
   forEachNode(nodes, task, options) {
+    // eslint-disable-next-line no-param-reassign
     options = options || {};
-    if (nodes == '*') {
+    if (nodes === '*') {
+      // eslint-disable-next-line no-param-reassign
       nodes = serverContext.cluster.nodes().map(node => node.id);
     } else if (!Array.isArray(nodes)) {
+      // eslint-disable-next-line no-param-reassign
       nodes = nodes.split(',');
     }
 
@@ -94,17 +100,6 @@ class Action {
     this.then(() => {
       action.running = true;
 
-      function handleNodeConnected(node) {
-        console.log('connected', node);
-      }
-
-      function handleNodeDisconnected(node) {
-        console.log('disconnected', node);
-      }
-
-      serverContext.cluster.on('node-connected', handleNodeConnected);
-      serverContext.cluster.on('node-disconnected', handleNodeDisconnected);
-
       function invokeTaskOnNode(node) {
         const taskIndex = results.length;
         results.push(undefined);
@@ -117,9 +112,7 @@ class Action {
         invokedTask.then((result) => {
           results[taskIndex] = result;
           completed++;
-          if (completed == nodes.length) {
-            serverContext.cluster.off('node-connected', handleNodeConnected);
-            serverContext.cluster.off('node-disconnected', handleNodeDisconnected);
+          if (completed === nodes.length) {
             action.running = false;
             action.result = results;
             action.sync.trigger(results);
@@ -134,6 +127,7 @@ class Action {
   }
 
   forEach(items, callback, options) {
+    // eslint-disable-next-line no-param-reassign
     options = options || {};
 
     const parallel = options.parallel || 1;
@@ -190,6 +184,7 @@ class PromiseAction extends Action {
   constructor(job, trigger, callback, options) {
     super(job, trigger);
 
+    // eslint-disable-next-line no-param-reassign
     options = options || {};
     this.while = options.while || function () { return false; };
 
@@ -200,6 +195,7 @@ class PromiseAction extends Action {
         self.result = value;
       }
       if (self.while(value)) {
+        // eslint-disable-next-line no-use-before-define
         doTask(value);
       } else {
         self.sync.trigger(value);
@@ -213,15 +209,16 @@ class PromiseAction extends Action {
         self.running = true;
 
         // auto start a job
+        // eslint-disable-next-line no-use-before-define
         if (result instanceof Job) {
           result.parent = self.job;
           result.start();
         }
 
         // wait until item completed
-        result.sync.on((value) => {
+        result.sync.on((finalResult) => {
           self.running = false;
-          complete(value);
+          complete(finalResult);
         });
       } else {
         complete(result);
@@ -243,6 +240,7 @@ class TaskAction extends Action {
     this.task = undefined;
     this.running = false;
 
+    // eslint-disable-next-line no-param-reassign
     options = options || {};
     this.while = options.while || function () { return false; };
 
@@ -280,7 +278,7 @@ class TaskAction extends Action {
             rootJob.state.mutateDataDelete(self.publish.name, self.publish.value);
           }
 
-          if (self.job.status == StatusCodes.cancelled) {
+          if (self.job.status === StatusCodes.cancelled) {
             self.emit('cancelled');
             self.running = false;
             self.sync.trigger(self.result);
@@ -297,14 +295,14 @@ class TaskAction extends Action {
           }
         });
 
-        if (self.job.status != StatusCodes.running) {
+        if (self.job.status !== StatusCodes.running) {
           killTask();
         }
       });
     }
 
     this.trigger.on(() => {
-      if (self.job.status == StatusCodes.cancelled) {
+      if (self.job.status === StatusCodes.cancelled) {
         self.emit('cancelled');
         self.sync.trigger();
         return;
@@ -323,9 +321,9 @@ class TaskAction extends Action {
 }
 
 class Job {
-  constructor(name) {
+  constructor(name, id = undefined) {
     this.parent = null;
-    this.id = uuid();
+    this.id = id || uuid();
     this.name = name || this.id;
 
     this.state = new MutableState({
@@ -357,7 +355,7 @@ class Job {
   }
 
   start() {
-    if (this.status == StatusCodes.new || this.status == StatusCodes.stopped) {
+    if (this.status === StatusCodes.new || this.status === StatusCodes.stopped) {
       this.status = StatusCodes.running;
       this.emit('start');
       this.root.sync.trigger();
@@ -365,7 +363,8 @@ class Job {
   }
 
   kill() {
-    if (this.status == StatusCodes.new || this.status == StatusCodes.running || this.status.StatusCodes.stopped) {
+    if (this.status === StatusCodes.new || this.status === StatusCodes.running ||
+        this.status.StatusCodes.stopped) {
       this.status = StatusCodes.cancelled;
       this.emit('cancelled');
       this.root.sync.trigger();
@@ -373,7 +372,7 @@ class Job {
   }
 
   complete(value) {
-    if (this.status == StatusCodes.new || this.status == StatusCodes.running) {
+    if (this.status === StatusCodes.new || this.status === StatusCodes.running) {
       this.result = value;
       this.status = StatusCodes.done;
       this.sync.trigger(value);
@@ -402,14 +401,16 @@ class Job {
     const action = new Action(this, this.root.sync);
     action.actions = actions;
 
+    function onActionDone() {
+      count++;
+      if (count === actions.length) {
+        action.result = actions.map(aa => aa.result);
+        action.sync.trigger(action.result);
+      }
+    }
+
     for (const a of actions) {
-      a.sync.on((result) => {
-        count++;
-        if (count == actions.length) {
-          action.result = actions.map(aa => aa.result);
-          action.sync.trigger(action.result);
-        }
-      });
+      a.sync.on(onActionDone);
     }
 
     return action;

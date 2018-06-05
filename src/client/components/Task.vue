@@ -3,7 +3,7 @@
 		<div class="header" v-bind:class="{ running: task.status == 'running' , 'high-cpu': task.usage.cpu > 50 }" @click="expanded = !expanded">
 			<span class="section type">N #{{taskNode}}</span>
 			<span class="section id">{{task.job || task.id}}</span>
-			<span class="section type">{{task.info.type || 'task' }}</span>
+			<span class="section type">{{task.details.service || 'task' }}</span>
 			<span class="section type">{{task.status}}</span>
 			<span class="section stat">
 				<span v-if="task.status == 'running'">

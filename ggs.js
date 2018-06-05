@@ -36,23 +36,23 @@ switch (process.argv[2]) {
     /* eslint-disable no-tabs */
     console.log(`
 usage: node ggs [task]
-	help     - show help screen
+  help     - show help screen
 
-	setup    - setup node config
-	service	 - install node as a service on local machine
+  setup    - setup node config
+  service  - install node as a service on local machine
 
-	serve    - start a local node.
-							--config to overwrite node config 
-							--port to overwrite startup port
+  serve    - start a local node.
+              --config to overwrite node config 
+              --port to overwrite startup port
 
-	ui			 - start a local node ui on port 8080
-						  --cluster to connect to a remote cluster
+  ui        - start a local node ui on port 8080
+              --cluster to connect to a remote cluster
 
-	local    - display list of local deployments
-	list     - list available deployments & products on central repository
-	upload   - upload deployments & products to central repository
-	deploy   - deploy deployments & products from central repository
-	remove   - remove local deployment
+  local    - display list of local deployments
+  list     - list available deployments & products on central repository
+  upload   - upload deployments & products to central repository
+  deploy   - deploy deployments & products from central repository
+  remove   - remove local deployment
 `);
     break;
 }

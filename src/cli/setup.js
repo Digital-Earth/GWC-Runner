@@ -3,27 +3,25 @@ const fs = require('fs');
 const inquirer = require('inquirer');
 const beautify = require('json-beautify');
 const exec = require('await-exec');
+const { getHostIps } = require('../utils');
 
 const hostname = os.hostname();
 const mem = Math.round((os.totalmem() / 1024 / 1024 / 1024));
 const cpus = os.cpus().length;
-const ips = [];
-{
-  const netFaces = os.networkInterfaces();
-  for (const name in netFaces) {
-    for (const networkAddress of netFaces[name]) {
-      if (networkAddress.family === 'IPv4' && !networkAddress.internal) {
-        ips.push({ name: `${networkAddress.address} (${name})`, value: networkAddress.address });
-      }
-    }
-  }
+
+const ipsByName = getHostIps();
+ipsByName.localhost = 'localhost';
+const networks = [];
+for (const name in ipsByName) {
+  networks.push({ name: `${ipsByName[name]} (${name})`, value: name });
 }
+
 
 const defaults = {
   hostname,
   mem,
   cpus,
-  ip: ips[0],
+  network: networks[0],
   type: 'node',
   nodePort: 4000,
   deployments: 'c:\\GGS\\deployments',
@@ -78,11 +76,11 @@ const setup = async () => {
       type: 'input',
       message: 'cache path (tiles storage)',
     }, {
-      name: 'ip',
-      default: defaults.ip,
+      name: 'network',
+      default: defaults.network,
       type: 'list',
-      choices: ips,
-      message: 'IP Address',
+      choices: networks,
+      message: 'Network',
     }, {
       name: 'nodePort',
       default: defaults.nodePort,
@@ -98,7 +96,7 @@ const setup = async () => {
       name: 'master',
       when: state => state.type !== 'master',
       default(state) {
-        return `http://${state.ip}:${state.nodePort + 1}`;
+        return `http://${ipsByName[state.network]}:${state.nodePort + 1}`;
       },
       type: 'input',
       message: 'Master port',

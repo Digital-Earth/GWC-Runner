@@ -25,11 +25,12 @@
                 <v-flex xs4>
                     <v-card dark color="secondary" hover height="100%">
                         <v-card-title primary-title >
-                            <div class="headline text-xs-center">Proxy</div>
+                            <div class="headline text-xs-center">Deployment</div>
                         </v-card-title>
                         <v-card-text class="px-0">
                             <div class="display-3">
-                                <toggle-button @change="toggleProxy" :sync="true" :value="proxyRunning"></toggle-button> Proxy
+                              <span v-if="state.deployment">{{state.deployment.name}} {{state.deployment.version}}</span>
+                              <span v-else>No Active deployment set</span>
                             </div>
                         </v-card-text>
                     </v-card>
@@ -38,11 +39,11 @@
                 <v-flex xs4>
                     <v-card dark color="secondary" hover height="100%">
                         <v-card-title primary-title >
-                            <div class="headline text-xs-center">GWC</div>
+                            <div class="headline text-xs-center">Status</div>
                         </v-card-title>
                         <v-card-text class="px-0">
                             <div class="display-3">
-                                <toggle-button @change="toggleGWC" :sync="true" :value="gwcRunning"></toggle-button> GWC
+                                <toggle-button @change="toggleRunning" :sync="true" :value="running"></toggle-button>{{running?"Running":"Idle"}}
                             </div>
                         </v-card-text>
                     </v-card>
@@ -228,23 +229,20 @@ export default {
           enabled: true
         }
       },
-      gwcRunning: store.state.services.gwc ? true : false,
-      proxyRunning: store.state.services.proxy ? true : false
+      running: store.state.deploymentRunning ? true : false,
     };
   },
+  watch: {
+    'state.deploymentRunning': function(value) {
+      this.running = value;
+    }
+  },
   methods: {
-    toggleGWC(event) {
+    toggleRunning(event) {
       if (event.value) {
-        this.$socket.emit("start-gwc");
+        this.$socket.emit("start-deployment");
       } else {
-        this.$socket.emit("stop-gwc");
-      }
-    },
-    toggleProxy(event) {
-      if (event.value) {
-        this.$socket.emit("start-proxy");
-      } else {
-        this.$socket.emit("stop-proxy");
+        this.$socket.emit("stop-deployment");
       }
     }
   },

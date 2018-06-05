@@ -2,7 +2,7 @@
 	"variables": {
 		"crawler-db-connection-string": "mongodb://pyxis:QgGaZXx4hSMm2tXkZOca655u76QrcG0YP8KcS5xxWv7vxKWkplLPKoEPEvpe1bLcRAz1JqCwLkpfF2WyT691FA==@pyxis.documents.azure.com:10255/?ssl=true&replicaSet=globaldb",
 		"gwc-server-start-port": 63000,
-		"gwc-geometry-start-port": 63000,
+		"gwc-geometry-start-port": 63010,
 		"gwc-import-start-port": 64000,
 		"proxy-port": "1337",
 		"gwc-server-count": 4,
@@ -17,11 +17,11 @@
 		},
 		"gwc":{
 			"product": "gwc",
-			"version": "1.0.3"
+			"version": "1.0.4"
 		},
 		"proxy":{
 			"product": "proxy",
-			"version": "1.0.4",
+			"version": "1.0.5",
 			"setup": "npm i"
 		}
 	},

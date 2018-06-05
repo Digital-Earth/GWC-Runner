@@ -1,34 +1,13 @@
 const path = require('path');
-const fs = require('fs');
 const clone = require('clone');
 const extend = require('extend');
+const { ensureDirectoryExists, getDeploymentDetails } = require('../utils');
 const es6template = require('es6-template');
+const serverContext = require('./ServerContext');
 
 class TaskResolver {
   constructor(nodeConfig) {
-    this.nodeConfig = nodeConfig;
-    this.deploymentsCache = {};
-  }
-
-  getDeploymentDetails(deployment) {
-    const key = `${deployment.name}.${deployment.version}`;
-
-    if (key in this.deploymentsCache) {
-      return this.deploymentsCache[key];
-    }
-
-    const deploymentPath = path.join(this.nodeConfig.deployments, key);
-    const deploymentFile = `${deploymentPath}.json`;
-
-    if (!fs.existsSync(deploymentPath) || !fs.existsSync(deploymentFile)) {
-      return undefined;
-    }
-
-    const deploymentDetails = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
-
-    deploymentDetails.root = deploymentPath;
-    this.deploymentsCache[key] = deploymentDetails;
-    return deploymentDetails;
+    this.nodeConfig = nodeConfig || serverContext.nodeConfig;
   }
 
   resolveDetails(taskDetails, callback) {
@@ -36,15 +15,6 @@ class TaskResolver {
     const newDetails = clone(taskDetails);
 
     // setup logs
-    function ensureDirectoryExists(directory) {
-      if (fs.existsSync(directory)) {
-        return;
-      }
-      const parent = path.dirname(directory);
-      ensureDirectoryExists(parent);
-      fs.mkdirSync(directory);
-    }
-
     const logPath = path.join(this.nodeConfig.cachePath, 'logs');
     ensureDirectoryExists(logPath);
 
@@ -65,7 +35,7 @@ class TaskResolver {
 
     // resolve path from deployment
     if (newDetails.service && newDetails.deployment) {
-      const deployment = this.getDeploymentDetails(newDetails.deployment);
+      const deployment = getDeploymentDetails(newDetails.deployment, this.nodeConfig);
 
       if (deployment) {
         variables = extend({}, deployment.variables, variables);
@@ -91,6 +61,9 @@ class TaskResolver {
 
           // overwrite log name with more detailed information
           newDetails.logFile = path.join(logPath, `log.\${time}.${productDetails.product}.${productDetails.version}.\${id}.txt`);
+
+          newDetails.details = newDetails.details || {};
+          newDetails.details.service = newDetails.service;
         }
       }
     }

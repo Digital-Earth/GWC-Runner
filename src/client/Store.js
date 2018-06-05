@@ -4,11 +4,8 @@ const vm = new Vue();
 
 const state = {
   connected: false,
-  services: {
-    gwc: false,
-    proxy: false,
-  },
   deployment: undefined,
+  deploymentRunning: false,
   urls: [],
   geoSources: [],
   nodes: [],
@@ -52,12 +49,12 @@ export default {
     vm.$emit(event, args);
   },
   clearAllDone() {
-    state.tasks = state.tasks.filter(task => task.status != 'done');
-    state.jobs = state.jobs.filter(job => job.status != 'done' && job.status != 'cancelled');
+    state.tasks = state.tasks.filter(task => task.status !== 'done' && task.status !== 'lost');
+    state.jobs = state.jobs.filter(job => job.status !== 'done' && job.status !== 'cancelled');
     for (const job of state.jobs) {
       const tasks = state.jobTasks[job.id];
       if (tasks) {
-        state.jobTasks[job.id] = tasks.filter(task => task.status != 'done');
+        state.jobTasks[job.id] = tasks.filter(task => task.status !== 'done' && task.status !== 'lost');
       }
     }
   },
