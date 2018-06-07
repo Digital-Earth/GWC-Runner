@@ -27,6 +27,9 @@ class Task {
       // how long to wait until the kill command take affect
       killCommandTimeout: 30 * 1000,
 
+      // how long to wait before killing the application if idle for long
+      killAfterIdle: undefined,
+
       // how quickly to update the CPU/Memory load
       usageRefreshRate: 5 * 1000,
 
@@ -64,6 +67,8 @@ class Task {
     this.killCommand = options.killCommand;
     this.killCommandTimeout = options.killCommandTimeout;
     this.usageRefreshRate = options.usageRefreshRate;
+    this.killAfterIdle = options.killAfterIdle;
+    console.log('killAfterIdle', this.killAfterIdle);
 
     this.logFile = options.logFile;
     this.logParser = options.logParser;
@@ -173,6 +178,11 @@ class Task {
           self.state.mutateUsage(newUsage);
         }
 
+        console.log('idleTime', self.idleTime);
+        if (self.killAfterIdle && self.idleTime > self.killAfterIdle) {
+          self.kill();
+        }
+
         // register another check
         self.updateUsageTimeoutId = setTimeout(() => {
           self.updateUsage();
@@ -201,6 +211,13 @@ class Task {
     if (this.state.status !== StatusCodes.done && !this.childProcess.killed) {
       this.childProcess.kill();
     }
+  }
+
+  get idleTime() {
+    if (this.state.usage.idleFrom) {
+      return new Date().getTime() - this.state.usage.idleFrom.getTime();
+    }
+    return 0;
   }
 }
 

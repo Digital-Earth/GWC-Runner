@@ -11,6 +11,18 @@ npm install
 # setup the node, this will prompt several questions for you to set things up
 node ggs setup
 
+# please note that if you are not running the node on elevation permissions (admin)
+# you will need to run those commands
+netsh http add urlacl url=http://*:63000/ user=[your-user]
+netsh http add urlacl url=http://*:63001/ user=[your-user]
+netsh http add urlacl url=http://*:63002/ user=[your-user]
+netsh http add urlacl url=http://*:63003/ user=[your-user]
+netsh http add urlacl url=http://*:63004/ user=[your-user]
+netsh http add urlacl url=http://*:63005/ user=[your-user]
+netsh http add urlacl url=http://*:63006/ user=[your-user]
+netsh http add urlacl url=http://*:63007/ user=[your-user]
+netsh http add urlacl url=http://*:64000/ user=[your-user]
+
 # run slave cluster node (for task execution).
 npm run node
 # you can run this several times to setup new nodes with different nodes

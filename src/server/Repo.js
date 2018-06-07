@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const azure = require('azure-storage');
+const compareVersions = require('compare-versions');
 const tar = require('tar');
 const { ensureDirectoryExists } = require('../utils');
 
@@ -34,7 +35,14 @@ class Repo {
         product: entry.metadata.product,
         version: entry.metadata.version,
       }));
-      versions.sort();
+      versions.sort((a, b) => {
+        if (a.product < b.product) {
+          return -1;
+        } else if (a.product > b.product) {
+          return 1;
+        }
+        return compareVersions(a.version, b.version);
+      });
       callback(null, versions);
     });
   }

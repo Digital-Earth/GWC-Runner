@@ -22,10 +22,28 @@ function getHostIps() {
       }
     }
   }
+
+  ips.localhost = 'localhost';
+  ips.all = '*';
+
   return ips;
 }
 
 const deploymentsCache = {};
+
+function listLocalDeployments(nodeConfig) {
+  const deployments = [];
+  const jsonFiles = fs.readdirSync(process.env.GGS_DEPLOYMENTS || nodeConfig.deployments).filter(entry => entry.endsWith('.json'));
+
+  for (const file of jsonFiles) {
+    const firstDot = file.indexOf('.');
+    const name = file.substr(0, firstDot);
+    const version = file.substr(firstDot + 1).replace('.json', '');
+    deployments.push({ name, version });
+  }
+
+  return deployments;
+}
 
 function getDeploymentDetails(deployment, nodeConfig) {
   if (!nodeConfig) {
@@ -55,6 +73,7 @@ function getDeploymentDetails(deployment, nodeConfig) {
 module.exports = {
   ensureDirectoryExists,
   getHostIps,
+  listLocalDeployments,
   getDeploymentDetails,
 };
 

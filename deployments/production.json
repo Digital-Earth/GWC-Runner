@@ -2,11 +2,8 @@
 	"variables": {
 		"crawler-db-connection-string": "mongodb://pyxis:QgGaZXx4hSMm2tXkZOca655u76QrcG0YP8KcS5xxWv7vxKWkplLPKoEPEvpe1bLcRAz1JqCwLkpfF2WyT691FA==@pyxis.documents.azure.com:10255/?ssl=true&replicaSet=globaldb",
 		"gwc-server-start-port": 63000,
-		"gwc-geometry-start-port": 63010,
 		"gwc-import-start-port": 64000,
-		"proxy-port": "1337",
-		"gwc-server-count": 4,
-		"gwc-geometry-count": 4,
+		"gwc-server-count": 8,
 		"gwc-import-count": 1
 	},
 	"products": {
@@ -17,12 +14,7 @@
 		},
 		"gwc":{
 			"product": "gwc",
-			"version": "1.0.4"
-		},
-		"proxy":{
-			"product": "proxy",
-			"version": "1.0.5",
-			"setup": "npm i"
+			"version": "1.0.8"
 		}
 	},
 	"services": {
@@ -44,19 +36,10 @@
 			"args": [
 				"-fd=${dataPath}",
 				"-cd=${cachePath}",
-				"http://${ip}:${gwc-server-start-port}+"
+				"http://${ip}:${gwc-server-start-port}+",
+				"-env=Production"
 			],
 			"instancesPerNode": "${gwc-server-count}"
-		},
-		"geometry": {
-			"product": "gwc",
-			"exec": "GeoWebCore.exe",
-			"args": [
-				"-fd=${dataPath}",
-				"-cd=${cachePath}",
-				"http://${ip}:${gwc-geometry-start-port}+"
-			],
-			"instancesPerNode": "${gwc-geometry-count}"
 		},
 		"import": {
 			"product": "gwc",
@@ -64,21 +47,10 @@
 			"args": [
 				"-fd=${dataPath}",
 				"-cd=${cachePath}",
-				"http://${ip}:${gwc-import-start-port}+"
+				"http://${ip}:${gwc-import-start-port}+",
+				"-env=Production"
 			],
 			"instancesPerNode": "${gwc-import-count}"
-		},
-		"proxy": {
-			"product": "proxy",
-			"version": "1.0.4",
-			"exec": "${nodePath}",
-			"env": {
-				"PORT": "${proxy-port}"
-			},
-			"args": [
-				"server.js"
-			],
-			"instancesPerNode": 1
 		}
 	}
 }

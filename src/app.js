@@ -1,10 +1,24 @@
 const http = require('http');
 const express = require('express');
-const config = require('./server/config');
+const parseArgs = require('minimist');
 
+const config = require('./server/config');
 const serverContext = require('./server/ServerContext');
 
+const PORT = process.env.PORT || 8080;
+
+const options = parseArgs(process.argv);
+
 const nodeConfig = require('./nodeConfig');
+
+if (options.local) {
+  nodeConfig.nodePort = +PORT;
+  if (nodeConfig.ip !== '*') {
+    nodeConfig.master = `http://${nodeConfig.ip}:${PORT}`;
+  } else {
+    nodeConfig.master = `http://localhost:${PORT}`;
+  }
+}
 
 console.log(nodeConfig);
 serverContext.nodeConfig = nodeConfig;
@@ -53,8 +67,6 @@ api.attach(server, app);
 if (config.production) {
   api.startGwc();
 }
-
-const PORT = process.env.PORT || 8080;
 
 server.listen(PORT, (err) => {
   if (err) {

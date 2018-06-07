@@ -1,5 +1,6 @@
 import Vue from 'vue';
 import VueRouter from 'vue-router';
+import VueResource from 'vue-resource';
 import Vuetify from 'vuetify';
 import App from './App.vue';
 import SocketService from './SocketService';
@@ -12,6 +13,7 @@ import Deployments from './components/Deployments.vue';
 
 import 'vuetify/dist/vuetify.css';
 
+Vue.use(VueResource);
 Vue.use(VueRouter);
 Vue.use(Vuetify);
 Vue.use(SocketService);

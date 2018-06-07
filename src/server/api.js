@@ -1,4 +1,5 @@
 const fs = require('fs');
+const ms = require('ms');
 const socketIo = require('socket.io');
 const parseArgs = require('minimist');
 const config = require('./config');
@@ -323,6 +324,7 @@ Api.jobs = {
       state: {
         type: 'list',
       },
+      killAfterIdle: ms('5m'),
     }).then((taskState) => {
       const roots = (taskState.data.roots || []).map(root => ({
         url: root.Uri,
@@ -353,6 +355,7 @@ Api.jobs = {
         type: 'add',
         url: details.url,
       },
+      killAfterIdle: ms('1m'),
     }).complete();
 
     return job;
@@ -381,6 +384,7 @@ Api.jobs = {
         type: 'update',
         url: details.url,
       },
+      killAfterIdle: ms('1m'),
     })
       .then((taskState) => {
         if (taskState.state.root) {
@@ -403,6 +407,7 @@ Api.jobs = {
         type: 'discover',
         url: details.url,
       },
+      killAfterIdle: ms('1h'),
     })
       .then((taskState) => {
         if (taskState.state.root) {
@@ -428,6 +433,7 @@ Api.jobs = {
         url: details.url,
         skip: skipDataset,
       },
+      killAfterIdle: ms('1h'),
     }), {
       while(taskState) {
         if (taskState.state.root) {
@@ -451,6 +457,7 @@ Api.jobs = {
             url: details.url,
             status: 'Broken',
           },
+          killAfterIdle: ms('1m'),
         });
       } else if (taskState.state.root.status === 'Broken') {
         return job.invoke({
@@ -462,6 +469,7 @@ Api.jobs = {
             url: details.url,
             status: 'Discovered',
           },
+          killAfterIdle: ms('1m'),
         });
       }
       return undefined;
@@ -491,14 +499,34 @@ Api.jobs = {
   gwcDownloadGeoSource(details) {
     const job = new Job('download GeoSource');
 
-    job.invoke(createGwcDetails('download-geosource', `pyxis://${details.id}`)).complete();
+    job.invoke({
+      name: `download ${details.id}`,
+      service: 'gwc',
+      deployment: Api.activeDeployment,
+      args: ['-d', `pyxis://${details.id}`],
+      state: {
+        geoSource: details.id,
+      },
+    }).complete();
+
+    // job.invoke(createGwcDetails('download-geosource', `pyxis://${details.id}`)).complete();
 
     return job;
   },
   gwcImportGeoSource(details) {
     const job = new Job('import GeoSource');
 
-    job.invoke(createGwcDetails('import-geosource', `pyxis://${details.id}`)).complete();
+    job.invoke({
+      name: `download ${details.id}`,
+      service: 'gwc',
+      deployment: Api.activeDeployment,
+      args: ['-import', `pyxis://${details.id}`],
+      state: {
+        geoSource: details.id,
+      },
+    }).complete();
+
+    // job.invoke(createGwcDetails('import-geosource', `pyxis://${details.id}`)).complete();
 
     return job;
   },

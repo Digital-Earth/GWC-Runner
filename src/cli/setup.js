@@ -10,7 +10,6 @@ const mem = Math.round((os.totalmem() / 1024 / 1024 / 1024));
 const cpus = os.cpus().length;
 
 const ipsByName = getHostIps();
-ipsByName.localhost = 'localhost';
 const networks = [];
 for (const name in ipsByName) {
   networks.push({ name: `${ipsByName[name]} (${name})`, value: name });

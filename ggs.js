@@ -31,6 +31,10 @@ switch (process.argv[2]) {
     require('./src/app');
     break;
 
+  case 'build':
+    require('./src/cli/build');
+    break;
+
   case 'help':
   default:
     /* eslint-disable no-tabs */
@@ -53,6 +57,8 @@ usage: node ggs [task]
   upload   - upload deployments & products to central repository
   deploy   - deploy deployments & products from central repository
   remove   - remove local deployment
+
+  build    - build project and create zip file ready for deployment
 `);
     break;
 }

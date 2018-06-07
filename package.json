@@ -13,9 +13,11 @@
     "production": "cross-env NODE_ENV=production node ggs ui --local"
   },
   "dependencies": {
+    "adm-zip": "^0.4.11",
     "await-exec": "^0.1.1",
     "azure-storage": "^2.7.0",
     "clone": "^2.1.1",
+    "compare-versions": "^3.2.1",
     "debounce": "^1.1.0",
     "es6-template": "^1.0.4",
     "event-emitter": "^0.3.5",
@@ -26,6 +28,7 @@
     "json-beautify": "^1.0.1",
     "minimist": "^1.2.0",
     "mongodb": "^3.0.4",
+    "ms": "^2.1.1",
     "node-windows": "^0.1.14",
     "pidusage": "^1.2.0",
     "rimraf": "^2.6.2",
@@ -35,6 +38,7 @@
     "uuid": "^3.1.0",
     "vue": "^2.3.3",
     "vue-chart": "^2.0.0",
+    "vue-resource": "^1.5.1",
     "vue-router": "^3.0.1",
     "vuetify": "^0.17.6"
   },

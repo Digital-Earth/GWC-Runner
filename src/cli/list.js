@@ -1,7 +1,6 @@
 const parseArgs = require('minimist');
 const Repo = require('../server/Repo');
 const config = require('../server/config');
-// const nodeConfig = require('../nodeConfig');
 
 module.exports = () => {
   if (process.argv[2] !== 'list') {
