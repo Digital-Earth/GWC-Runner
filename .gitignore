@@ -2,6 +2,7 @@
 cluster.config.json
 node.config.json
 node.master.config.json
+GWC-Runner.zip
 
 # dist
 dist/

@@ -43,7 +43,7 @@ class TaskResolver {
         // resolve arguments from deployment
         if (newDetails.service in deployment.services) {
           const serviceDetails = deployment.services[newDetails.service];
-          const productDetails = deployment.services[serviceDetails.product];
+          const productDetails = deployment.products[serviceDetails.product];
 
           const servicePath = path.join(deployment.root, serviceDetails.product);
           newDetails.cwd = servicePath;
@@ -60,7 +60,7 @@ class TaskResolver {
           }
 
           // overwrite log name with more detailed information
-          newDetails.logFile = path.join(logPath, `log.\${time}.${productDetails.product}.${productDetails.version}.\${id}.txt`);
+          newDetails.logFile = path.join(logPath, `log.\${time}.${serviceDetails.product}.${productDetails.version}.\${id}.txt`);
 
           newDetails.details = newDetails.details || {};
           newDetails.details.service = newDetails.service;

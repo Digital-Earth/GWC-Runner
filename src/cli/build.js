@@ -13,7 +13,7 @@ module.exports = () => {
 
   entries.forEach((entry) => {
     switch (entry) {
-      case '.reop':
+      case '.repo':
       case '.git':
       case '.vscode':
       case 'deployments':
@@ -22,18 +22,22 @@ module.exports = () => {
       case 'spec':
       case 'cluster.config.json':
       case 'node.config.json':
+      case 'GWC-Runner.zip':
         return;
 
       default:
         break;
     }
 
+    console.log(entry);
+
     if (fs.statSync(entry).isDirectory()) {
-      zip.addLocalFolder(entry);
+      zip.addLocalFolder(entry, entry);
     } else {
       zip.addLocalFile(entry);
     }
   });
 
+  fs.unlinkSync('GWC-Runner.zip');
   zip.writeZip('GWC-Runner.zip');
 };

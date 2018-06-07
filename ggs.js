@@ -32,7 +32,7 @@ switch (process.argv[2]) {
     break;
 
   case 'build':
-    require('./src/cli/build');
+    require('./src/cli/build')();
     break;
 
   case 'help':
