@@ -42,7 +42,25 @@ function listLocalDeployments(nodeConfig) {
     deployments.push({ name, version });
   }
 
+  // adding local development details
+  if (nodeConfig.dev && Array.isArray(nodeConfig.deployments)) {
+    for (const deployment of nodeConfig.deployments) {
+      deployments.push({ name: deployment.name, version: deployment.version });
+    }
+  }
+
   return deployments;
+}
+
+function findDevDeployment(deployment, nodeConfig) {
+  if (nodeConfig.dev && Array.isArray(nodeConfig.deployments)) {
+    for (const dev of nodeConfig.deployments) {
+      if (dev.name === deployment.name && dev.version === deployment.version) {
+        return dev;
+      }
+    }
+  }
+  return undefined;
 }
 
 function getDeploymentDetails(deployment, nodeConfig) {
@@ -52,22 +70,27 @@ function getDeploymentDetails(deployment, nodeConfig) {
 
   const key = `${deployment.name}.${deployment.version}`;
 
-  if (key in deploymentsCache) {
-    return deploymentsCache[key];
+  if (!(key in deploymentsCache)) {
+    const devDeployment = findDevDeployment(deployment);
+
+    if (devDeployment) {
+      const deploymentDetails = JSON.parse(fs.readFileSync(devDeployment.path, 'utf8'));
+      deploymentsCache[key] = deploymentDetails;
+    } else {
+      const deploymentPath = path.join(nodeConfig.deployments, key);
+      const deploymentFile = `${deploymentPath}.json`;
+
+      if (!fs.existsSync(deploymentPath) || !fs.existsSync(deploymentFile)) {
+        return undefined;
+      }
+
+      const deploymentDetails = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
+      deploymentDetails.root = deploymentPath;
+      deploymentsCache[key] = deploymentDetails;
+    }
   }
 
-  const deploymentPath = path.join(nodeConfig.deployments, key);
-  const deploymentFile = `${deploymentPath}.json`;
-
-  if (!fs.existsSync(deploymentPath) || !fs.existsSync(deploymentFile)) {
-    return undefined;
-  }
-
-  const deploymentDetails = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
-
-  deploymentDetails.root = deploymentPath;
-  deploymentsCache[key] = deploymentDetails;
-  return deploymentDetails;
+  return deploymentsCache[key];
 }
 
 module.exports = {
