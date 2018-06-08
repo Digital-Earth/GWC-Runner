@@ -17,7 +17,7 @@ module.exports = {
   //   cacheFolder: 'D:\\pyxis-gallery\\PYXCache\\',
   //   filesFolder: 'D:\\pyxis-gallery\\UserFiles\\',
 
-  //   // use this host for poduction
+  //   // use this host for production
   //   // host: 'http://*',
   //   host: 'http://localhost',
   //   masterHost: 'http://localhost',

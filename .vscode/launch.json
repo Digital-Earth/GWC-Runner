@@ -14,13 +14,20 @@
 			"type": "node",
 			"request": "launch",
 			"name": "Launch DEV UI",
-			"program": "${workspaceRoot}\\src\\app.js"
+			"program": "${workspaceRoot}\\ggs.js",
+			"args": [
+				"ui",
+				"--local"
+			],
 		},
 		{
 			"type": "node",
 			"request": "launch",
-			"name": "Launch rootNode",
-			"program": "${workspaceRoot}\\src\\rootNode.js"
+			"name": "Launch node",
+			"program": "${workspaceRoot}\\ggs.js",
+			"args": [
+				"serve"
+			]
 		}
 	]
 }

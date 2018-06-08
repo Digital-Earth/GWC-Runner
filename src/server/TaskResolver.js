@@ -45,7 +45,16 @@ class TaskResolver {
           const serviceDetails = deployment.services[newDetails.service];
           const productDetails = deployment.products[serviceDetails.product];
 
-          const servicePath = path.join(deployment.root, serviceDetails.product);
+          let servicePath = path.join(deployment.root, serviceDetails.product);
+
+          // overwrite dev path if found on node config
+          if (this.nodeConfig.dev &&
+              this.nodeConfig.dev.products &&
+              this.nodeConfig.dev.products[serviceDetails.product]) {
+            servicePath = this.nodeConfig.dev.products[serviceDetails.product];
+            newDetails.state = newDetails.state || {};
+            newDetails.state.dev_cwd = servicePath;
+          }
           newDetails.cwd = servicePath;
 
           const exec = path.resolve(servicePath, es6template(serviceDetails.exec, variables));

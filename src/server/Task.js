@@ -68,7 +68,6 @@ class Task {
     this.killCommandTimeout = options.killCommandTimeout;
     this.usageRefreshRate = options.usageRefreshRate;
     this.killAfterIdle = options.killAfterIdle;
-    console.log('killAfterIdle', this.killAfterIdle);
 
     this.logFile = options.logFile;
     this.logParser = options.logParser;
@@ -178,7 +177,6 @@ class Task {
           self.state.mutateUsage(newUsage);
         }
 
-        console.log('idleTime', self.idleTime);
         if (self.killAfterIdle && self.idleTime > self.killAfterIdle) {
           self.kill();
         }

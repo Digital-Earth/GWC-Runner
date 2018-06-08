@@ -2,18 +2,15 @@ const fs = require('fs');
 const ms = require('ms');
 const socketIo = require('socket.io');
 const parseArgs = require('minimist');
-const config = require('./config');
 const serverContext = require('./ServerContext');
-const TaskResolver = require('./TaskResolver');
 const Job = require('./Job');
 const DeploymentJob = require('./DeploymentJob');
-const { ClusterTaskManager, LocalTaskManager, RemoteTaskManager } = require('./TaskManager');
 
 const createGwcDetails = require('./jobs/gwc');
 
 const activeDeploymentFile = 'cluster.config.json';
 
-const Api = {};
+const Api = require('./socket.api.js');
 
 Api.attach = (server, app) => {
   const options = parseArgs(process.argv);
@@ -21,33 +18,13 @@ Api.attach = (server, app) => {
 
   const io = socketIo(server);
 
-  const nodesSocket = io.of('/node');
-  serverContext.cluster = new ClusterTaskManager(nodesSocket);
 
   if (fs.existsSync(activeDeploymentFile)) {
     Api.activeDeployment = JSON.parse(fs.readFileSync(activeDeploymentFile, 'utf8'));
   }
 
-  if (options.cluster) {
-    /* eslint-disable global-require */
-    const socketClient = require('socket.io-client');
-    const cluster = socketClient(`${options.cluster}/cluster`);
-    serverContext.cluster.addNode('cluster', new RemoteTaskManager(cluster));
-  } else {
-    const { nodeConfig } = serverContext;
-    const taskResolver = new TaskResolver(nodeConfig);
-    const localConfig = {
-      resolveDetails: (details, callback) => taskResolver.resolveDetails(details, callback),
-      info: {
-        name: `${serverContext.nodeConfig.ip}:${serverContext.nodeConfig.nodePort}`,
-        config: serverContext.nodeConfig,
-      },
-    };
-    serverContext.cluster.addNode('local', new LocalTaskManager(null, localConfig));
-  }
-
-  serverContext.api = Api;
-  serverContext.config = config;
+  Api.attachNodesNamespace(io.of('/node'), options);
+  Api.attachEndpointsNamespace(io.of('/endpoint'), options);
 
   function transformTask(task) {
     return {
@@ -261,25 +238,10 @@ Api.attach = (server, app) => {
     /* END - ALL LEGACY STUFF */
   });
 
-  // rest API
-  app.get('/nodes', (req, res) => {
-    res.send(JSON.stringify(serverContext.cluster.nodes()));
-    res.end();
-  });
 
-  app.get('/tasks', (req, res) => {
-    res.send(JSON.stringify(serverContext.cluster.tasks()));
-    res.end();
-  });
+  Api.attachRestAPI(app);
 
-  app.get('/endpoints', (req, res) => {
-    const endpoints = serverContext.cluster.tasks()
-      .filter(task => Object.keys(task.endpoints).length > 0)
-      .map(task => ({ endpoints: task.endpoints, details: task.details, state: task.state }));
-    res.send(JSON.stringify(endpoints));
-    res.end();
-  });
-
+  // additional rest API
   app.get('/jobs/:id', (req, res) => {
     function jobFilter(job) {
       return job.id === req.params.id || job.name === req.params.id;
@@ -303,13 +265,17 @@ Api.attach = (server, app) => {
 };
 
 Api.startDeployment = (deployment) => {
+  Api.stopDeployment();
   Api.deploymentJob = Api.jobs.runDeployment(deployment || Api.activeDeployment);
   Api.trackJob(Api.deploymentJob);
   Api.deploymentJob.start();
 };
 
 Api.stopDeployment = () => {
-  Api.deploymentJob.kill();
+  if (Api.deploymentJob) {
+    Api.deploymentJob.kill();
+  }
+  delete Api.deploymentJob;
 };
 
 Api.jobs = {
