@@ -1,4 +1,6 @@
 {
 	"eslint.autoFixOnSave": true,
-	"editor.tabSize": 2
+	"editor.tabSize": 2,
+	"files.eol": "\n",
+	"files.trimTrailingWhitespace": true
 }

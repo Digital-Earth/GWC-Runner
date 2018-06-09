@@ -71,7 +71,7 @@ function getDeploymentDetails(deployment, nodeConfig) {
   const key = `${deployment.name}.${deployment.version}`;
 
   if (!(key in deploymentsCache)) {
-    const devDeployment = findDevDeployment(deployment);
+    const devDeployment = findDevDeployment(deployment, nodeConfig);
 
     if (devDeployment) {
       const deploymentDetails = JSON.parse(fs.readFileSync(devDeployment.path, 'utf8'));

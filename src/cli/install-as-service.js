@@ -1,11 +1,23 @@
-import { Service } from 'node-windows';
+const { Service } = require('node-windows');
+const parseArgs = require('minimist');
 
 module.exports = () => {
+  const options = parseArgs(process.argv.slice(4));
+
+  // create environment variables
+  const env = [
+    { name: 'GGS_ROOT', value: `${process.cwd()}` },
+    { name: 'GGS_CONFIG', value: `${process.cwd()}\\node.config.json` },
+  ];
+  if (options.ui) {
+    env.push({ name: 'GGS_UI', value: 1 });
+  }
   // Create a new service object
   const svc = new Service({
-    name: 'GGS Node Cluster',
-    description: 'Global Grid Node server.',
-    script: `${process.cwd()}\\src\\node.js`,
+    name: 'GGS Cluster',
+    description: 'Global Grid Systems node controller.',
+    script: `${process.cwd()}\\src\\boot-as-service.js`,
+    env,
   });
 
   // Listen for the "install" event, which indicates the
@@ -27,7 +39,7 @@ module.exports = () => {
     default:
       console.log(`
 available commands:
-  node ggs service install 
+  node ggs service install [--ui]
   node ggs service uninstall`);
   }
 };

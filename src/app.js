@@ -64,8 +64,8 @@ const api = require('./server/api');
 
 api.attach(server, app);
 
-if (config.production) {
-  api.startGwc();
+if (config.production || options.autorun) {
+  api.startDeployment();
 }
 
 server.listen(PORT, (err) => {

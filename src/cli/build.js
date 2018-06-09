@@ -38,6 +38,9 @@ module.exports = () => {
     }
   });
 
-  fs.unlinkSync('GWC-Runner.zip');
+  if (fs.existsSync('GWC-Runner.zip')) {
+    fs.unlinkSync('GWC-Runner.zip');
+  }
+
   zip.writeZip('GWC-Runner.zip');
 };

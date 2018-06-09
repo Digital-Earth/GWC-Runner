@@ -9,7 +9,7 @@
 npm install
 
 # setup the node, this will prompt several questions for you to set things up
-node ggs setup
+ggs setup
 
 # please note that if you are not running the node on elevation permissions (admin)
 # you will need to run those commands
@@ -24,18 +24,25 @@ netsh http add urlacl url=http://*:63007/ user=[your-user]
 netsh http add urlacl url=http://*:64000/ user=[your-user]
 
 # run slave cluster node (for task execution).
-npm run node
+ggs serve
 # you can run this several times to setup new nodes with different nodes
-npm run node --port 1234
+ggs serve node --port 1234
 
 # serve with hot reload at localhost:8080 and setup a local node
 npm run dev
 
 # serve with hot reload at localhost:88080 and connect to cluster master node
-npm run ui --cluster http://localhost:4000
+ggs ui --cluster http://localhost:4000
 
 # build for production with minification
-npm run build
+ggs build
+
+# for production server, you might want to install it as a service
+
+ggs service install
+
+# if this is the main server, you might want to enable UI as well (port 8080)
+ggs service install --ui
 
 ```
 
@@ -48,7 +55,7 @@ Therefore, we decided to build a small task-manager. however, to make it to work
 
 ### Cluster Node
 
-```node ggs serve```
+```ggs serve```
 
 this is a simple task manager node. it able to download deployments repo and execute tasks.
 
@@ -56,7 +63,7 @@ this node connected using socket.io to root-node to stream task progress and als
 
 ### Root Node
 
-```node gss serve --config your-node.config.json --local```
+```gss serve --config your-node.config.json --local```
 
 change the node.config.json to ```{ type: "master"}``` to enable the node to expose the socket.io to control the cluster and server as a master node.
 mroeover, use ```--local``` options to start enable the root node to act a task manager as well.
@@ -76,7 +83,7 @@ also, the root node provide rest api:
 ```npm run dev```
 or
 
-```node ggs ui --local```
+```ggs ui --local```
 
 run a Vue+webpack ui to track the state of a cluster.
 this server can act as a root-node or it connect to remote root-node by using ```--cluster root-node-url```
@@ -86,7 +93,7 @@ this server can act as a root-node or it connect to remote root-node by using ``
 to use cluster you need to set an active deployment. an active deployment will download published binaries for execution.
 However, this is not the right tool for local development and debugging.
 
-Therefore, you can add the following to node.config.json: 
+Therefore, you can add the following to node.config.json:
 
 ### Override specific product path
 ```
