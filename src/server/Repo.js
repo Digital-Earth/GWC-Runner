@@ -88,6 +88,7 @@ class Repo {
         filter(entry) {
           console.log(entry);
           if (entry === './.pyx') { return false; }
+          if (entry === './.ggs') { return false; }
           if (entry === './.git') { return false; }
           if (entry === './node_modules') { return false; }
           if (entry.endsWith('.pdb')) { return false; }
