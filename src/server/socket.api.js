@@ -63,6 +63,17 @@ Api.attachRestAPI = (app) => {
     res.send(JSON.stringify(endpoints));
     res.end();
   });
+
+  app.get('/endpoints/:service/:endpoint', (req, res) => {
+    const endpoints = [];
+    serverContext.cluster.tasks()
+      .filter(task =>
+        (req.params.endpoint in task.endpoints) &&
+        task.details.service === req.params.service)
+      .forEach(task => endpoints.push(task.endpoints[req.params.endpoint]));
+    res.send(JSON.stringify(endpoints));
+    res.end();
+  });
 };
 
 Api.attachEndpointsNamespace = (io) => {

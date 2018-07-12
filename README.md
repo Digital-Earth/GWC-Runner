@@ -76,7 +76,8 @@ the root node provide socket.io api:
 also, the root node provide rest api:
 1) /nodes - return list of nodes on the cluster
 2) /tasks - return list of tasks on the cluster
-3) /endpoints - return list of all tasks endpoints
+3.1) /endpoints - return list of all tasks endpoints
+3.2) /endpoints/service/endpoint-name - return list of all endpoints for a given service and endpoint name
 
 ### UI
 

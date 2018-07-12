@@ -32,6 +32,9 @@ class TaskResolver {
     newDetails.env.GGS_LOGS = logPath;
 
     let variables = extend({}, this.nodeConfig, newDetails.details);
+    if (this.nodeConfig.dev && this.nodeConfig.dev.variables) {
+      variables = extend(variables, this.nodeConfig.dev.variables);
+    }
 
     // resolve path from deployment
     if (newDetails.service && newDetails.deployment) {
@@ -49,11 +52,12 @@ class TaskResolver {
 
           // overwrite dev path if found on node config
           if (this.nodeConfig.dev &&
-              this.nodeConfig.dev.products &&
-              this.nodeConfig.dev.products[serviceDetails.product]) {
+            this.nodeConfig.dev.products &&
+            this.nodeConfig.dev.products[serviceDetails.product]) {
             servicePath = this.nodeConfig.dev.products[serviceDetails.product];
             newDetails.state = newDetails.state || {};
             newDetails.state.dev_cwd = servicePath;
+            newDetails.env.NODE_ENV = 'development';
           }
           newDetails.cwd = servicePath;
 
