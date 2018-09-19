@@ -1,7 +1,7 @@
 const parseArgs = require('minimist');
 const Repo = require('../server/Repo');
 const config = require('../server/config');
-// const nodeConfig = require('../nodeConfig');
+const nodeConfig = require('../nodeConfig');
 
 module.exports = () => {
   if (process.argv[2] !== 'upload') {
@@ -9,6 +9,16 @@ module.exports = () => {
   }
 
   const options = parseArgs(process.argv.slice(3));
+
+  if (nodeConfig.dev && nodeConfig.dev.products && options._.length === 0) {
+    if (options.p in nodeConfig.dev.products) {
+      options._.push(nodeConfig.dev.products[options.p]);
+    }
+    if (options.d in nodeConfig.dev.products) {
+      options._.push(nodeConfig.dev.products[options.d]);
+    }
+  }
+
   if ((!options.p && !options.d) || options._.length !== 1) {
     console.log('usage: node ggs.js upload [-p=gwc|-d=cluster] [-v=1.2.3] folder');
     return;

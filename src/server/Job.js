@@ -260,7 +260,10 @@ class TaskAction extends Action {
       const rootJob = self.job.getRootJob();
 
       self.details.details.job = rootJob.id;
-
+      if (!self.details.env) {
+        self.details.env = {};
+      }
+      self.details.env.GGS_JOB = rootJob.id;
 
       serverContext.cluster.start(self.details, (state) => {
         self.task = state;
@@ -363,8 +366,9 @@ class Job {
   }
 
   kill() {
-    if (this.status === StatusCodes.new || this.status === StatusCodes.running ||
-        this.status.StatusCodes.stopped) {
+    if (this.status === StatusCodes.new ||
+      this.status === StatusCodes.running ||
+      this.status === StatusCodes.stopped) {
       this.status = StatusCodes.cancelled;
       this.emit('cancelled');
       this.root.sync.trigger();

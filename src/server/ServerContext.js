@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 const ee = require('event-emitter');
 
 const context = {
@@ -9,6 +7,8 @@ const context = {
   roots: [],
   nodes: [],
   geoSources: [],
+  // keep track of completed tasks for X minutes to enable status on completed tasks for a while.
+  completedTasks: {},
   config: undefined,
   nodeConfig: undefined,
 };

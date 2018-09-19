@@ -3,18 +3,18 @@
 		"crawler-db-connection-string": "mongodb://pyxis:QgGaZXx4hSMm2tXkZOca655u76QrcG0YP8KcS5xxWv7vxKWkplLPKoEPEvpe1bLcRAz1JqCwLkpfF2WyT691FA==@pyxis.documents.azure.com:10255/?ssl=true&replicaSet=globaldb",
 		"gwc-server-start-port": 63000,
 		"proxy-port": "1337",
-		"ui-port": "52023",
+		"ui-port": "62000",
 		"gwc-server-count": 8
 	},
 	"products": {
 		"cli": {
 			"product": "cli",
-			"version": "1.0.7",
+			"version": "1.0.9",
 			"setup": "pyx.exe config \"-mongo=${crawler-db-connection-string}\""
 		},
 		"ui":{
 			"product": "ui",
-			"version": "1.0.3",
+			"version": "1.0.5",
 			"setup": "npm i"
 		},
 		"proxy":{

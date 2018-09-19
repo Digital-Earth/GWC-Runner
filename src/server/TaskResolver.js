@@ -58,6 +58,8 @@ class TaskResolver {
             newDetails.state = newDetails.state || {};
             newDetails.state.dev_cwd = servicePath;
             newDetails.env.NODE_ENV = 'development';
+          } else {
+            newDetails.env.NODE_ENV = 'production';
           }
           newDetails.cwd = servicePath;
 

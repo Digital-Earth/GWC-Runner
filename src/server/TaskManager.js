@@ -145,21 +145,23 @@ class LocalTaskManager {
 
   /**
 	 * @param {string} id
-	 * @returns {Task|undefined} task
+	 * @returns {MutableState|undefined} task
 	 */
   getTaskById(id) {
     for (const task of this._tasks) {
       if (task.state.id === id) {
-        return task;
+        return task.state;
       }
     }
     return undefined;
   }
 
   killTaskById(id) {
-    const task = this.getTaskById(id);
-    if (task) {
-      task.kill();
+    for (const task of this._tasks) {
+      if (task.state.id === id) {
+        task.kill();
+        return;
+      }
     }
   }
 

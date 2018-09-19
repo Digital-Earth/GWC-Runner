@@ -241,13 +241,16 @@ Api.attach = (server, app) => {
 
   Api.attachRestAPI(app);
 
+  Api.findJob = (jobIdOrName) => {
+    function jobFilter(job) {
+      return job.id === jobIdOrName || job.name === jobIdOrName;
+    }
+    return serverContext.jobs.filter(jobFilter)[0];
+  };
+
   // additional rest API
   app.get('/jobs/:id', (req, res) => {
-    function jobFilter(job) {
-      return job.id === req.params.id || job.name === req.params.id;
-    }
-
-    const job = serverContext.jobs.filter(jobFilter)[0];
+    const job = Api.findJob(req.params.id);
     if (job) {
       res.send(JSON.stringify(transformJob(job)));
       res.end();
@@ -256,6 +259,56 @@ Api.attach = (server, app) => {
       res.send(`Job ${req.params.id} not found`);
       res.end();
     }
+  });
+
+  function startNewCliTask(jobId, args, callback) {
+    const job = Api.findJob(jobId);
+    if (job) {
+      const taskAction = job.startNewCliTask(args);
+      taskAction.on('start', () => {
+        const { task } = taskAction;
+        callback(null, {
+          id: task.id,
+          name: task.name,
+          status: task.status,
+          endpoints: task.endpoints,
+          details: task.details,
+          state: task.state,
+          log: task.log,
+          data: task.data,
+        });
+      });
+    } else {
+      callback(`Job ${jobId} not found`);
+    }
+  }
+
+  app.get('/jobs/:id/discover', (req, res) => {
+    const args = ['workspace', 'discover', req.query.reference];
+    startNewCliTask(req.params.id, args, (error, task) => {
+      if (error) {
+        res.status(404);
+        res.send(error);
+        res.end();
+      } else {
+        res.send(JSON.stringify(task));
+        res.end();
+      }
+    });
+  });
+
+  app.get('/jobs/:id/import', (req, res) => {
+    const args = ['workspace', 'import', req.query.reference];
+    startNewCliTask(req.params.id, args, (error, task) => {
+      if (error) {
+        res.status(404);
+        res.send(error);
+        res.end();
+      } else {
+        res.send(JSON.stringify(task));
+        res.end();
+      }
+    });
   });
 
   app.get('/jobs', (req, res) => {

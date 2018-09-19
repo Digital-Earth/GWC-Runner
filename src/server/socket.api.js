@@ -40,6 +40,17 @@ Api.attachNodesNamespace = (io, options) => {
     serverContext.cluster.on('kill-task', task => console.log('kill-task', task));
     serverContext.cluster.on('task-end', task => console.log('task-end', task));
   }
+
+  serverContext.completedTasks = {};
+  function addCompletedTasks(task) {
+    serverContext.completedTasks[task.id] = task;
+    const timeToKeepInDictionary = 5 * 60 * 1000;
+    setTimeout(() => {
+      delete serverContext.completedTasks[task.id];
+    }, timeToKeepInDictionary);
+  }
+  serverContext.cluster.on('task-end', addCompletedTasks);
+
   serverContext.cluster.on('node-connected', node => console.log('node-connected', node.id, `${node.config.ip}:${node.config.nodePort}`));
   serverContext.cluster.on('node-disconnected', node => console.log('node-disconnected', node.id, `${node.config.ip}:${node.config.nodePort}`));
 };
@@ -56,6 +67,31 @@ Api.attachRestAPI = (app) => {
     res.end();
   });
 
+  app.get('/tasks/:taskId', (req, res) => {
+    let task;
+    if (req.params.taskId in serverContext.completedTasks) {
+      task = serverContext.completedTasks[req.params.taskId];
+    } else {
+      task = serverContext.cluster.getTaskById(req.params.taskId);
+    }
+    if (task == null) {
+      res.status(404);
+      res.send(`Task ${req.params.taskId} not found`);
+      res.end();
+    } else {
+      res.send(JSON.stringify({
+        id: task.id,
+        name: task.name,
+        status: task.status,
+        endpoints: task.endpoints,
+        details: task.details,
+        state: task.state,
+        log: task.log,
+        data: task.data,
+      }));
+    }
+  });
+
   app.get('/endpoints', (req, res) => {
     const endpoints = serverContext.cluster.tasks()
       .filter(task => Object.keys(task.endpoints).length > 0)
@@ -66,11 +102,15 @@ Api.attachRestAPI = (app) => {
 
   app.get('/endpoints/:service/:endpoint', (req, res) => {
     const endpoints = [];
-    serverContext.cluster.tasks()
-      .filter(task =>
-        (req.params.endpoint in task.endpoints) &&
-        task.details.service === req.params.service)
-      .forEach(task => endpoints.push(task.endpoints[req.params.endpoint]));
+    if (req.params.service === 'master' && req.params.endpoint === 'api') {
+      endpoints.push(serverContext.nodeConfig.master);
+    } else {
+      serverContext.cluster.tasks()
+        .filter(task =>
+          (req.params.endpoint in task.endpoints) &&
+          task.details.service === req.params.service)
+        .forEach(task => endpoints.push(task.endpoints[req.params.endpoint]));
+    }
     res.send(JSON.stringify(endpoints));
     res.end();
   });
@@ -108,6 +148,10 @@ Api.attachEndpointsNamespace = (io) => {
         endpoints[service][name].sort();
       }
     }
+
+    // add master endpoint
+    endpoints.master = { api: [serverContext.nodeConfig.master] };
+
     return endpoints;
   }
 

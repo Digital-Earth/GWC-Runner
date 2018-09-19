@@ -148,6 +148,17 @@ function createDeploymentJob(deployment) {
 
   job.invoke(checkDesiredState);
 
+  // this is used by commands to invoke a new cli commands such discover/ import/ clean cache etc.
+  job.startNewCliTask = function startNewCliTask(args) {
+    const newTask = {
+      name: args.join(' '),
+      service: 'cli',
+      args: ['-cwd=${dataPath}'].concat(args),
+      deployment,
+    };
+    return job.invoke(newTask);
+  };
+
   return job;
 }
 
