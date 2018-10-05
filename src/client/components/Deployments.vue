@@ -1,7 +1,7 @@
 <template>
 	<div>
 		<h2>Deployments <v-btn round color="primary" @click="startListNodes()"><v-icon>refresh</v-icon></v-btn></h2>
-		
+
     <v-container grid-list-md text-xs-center>
       <v-layout row wrap>
         <v-flex>
@@ -41,7 +41,7 @@
           <v-text-field
             name="deploymentName"
             label="Deploy New Deployment"
-            v-model="newDeployment.name" 
+            v-model="newDeployment.name"
             dark>
           </v-text-field>
         </v-flex>
@@ -49,7 +49,7 @@
           <v-text-field
             name="deploymentVersion"
             label="Version"
-            v-model="newDeployment.version" 
+            v-model="newDeployment.version"
             dark>
           </v-text-field>
         </v-flex>
@@ -91,7 +91,8 @@
                    <v-list class="ma-0 pa-0" light>
                     <v-list-tile v-for="(endpoint,index) of nodeEndpoints[node.id]" :key="index" class="grey lighten-2">
                       <v-list-tile-content>
-                        <v-list-tile-title class="black--text">{{endpoint.url}} --> {{endpoint.name}}</v-list-tile-title>
+                        <v-list-tile-title class="black--text">
+                          <a :href="endpoint.url" target="blank">{{endpoint.url}}</a> --> {{endpoint.name}}</v-list-tile-title>
                       </v-list-tile-content>
                     </v-list-tile>
                   </v-list>
@@ -99,9 +100,9 @@
 
                 <v-expansion-panel-content v-if="node.config">
                   <div slot="header" class="headline">Config</div>
-                  <pre class="pa-3 grey lighten-2">{{node.config}}</pre>								
+                  <pre class="pa-3 grey lighten-2">{{node.config}}</pre>
                 </v-expansion-panel-content>
-                
+
                 <v-expansion-panel-content v-if="node.deployments">
                   <div slot="header" class="headline">Deployments</div>
                   <v-list class="ma-0 pa-0">
@@ -202,7 +203,7 @@ export default {
 
       for (let deployment of deployments) {
         if (this.state.deployment && this.state.deployment.name == deployment.name && this.state.deployment.version == deployment.version) {
-          deployment.status = "ACTIVE"  
+          deployment.status = "ACTIVE"
         } else {
           deployment.status = deployment.nodes == neededNodesCount ? "OK" : "PENDING";
         }

@@ -12,7 +12,12 @@ const cpus = os.cpus().length;
 const ipsByName = getHostIps();
 const networks = [];
 for (const name in ipsByName) {
-  networks.push({ name: `${ipsByName[name]} (${name})`, value: name });
+  const network = { name: `${ipsByName[name]} (${name})`, value: name };
+  if (name === 'localhost') {
+    networks.unshift(network);
+  } else {
+    networks.push(network);
+  }
 }
 
 

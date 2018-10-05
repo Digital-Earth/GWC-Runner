@@ -284,7 +284,7 @@ Api.attach = (server, app) => {
   }
 
   app.get('/jobs/:id/discover', (req, res) => {
-    const args = ['workspace', 'discover', req.query.reference];
+    const args = ['discover', req.query.reference];
     startNewCliTask(req.params.id, args, (error, task) => {
       if (error) {
         res.status(404);
@@ -298,7 +298,7 @@ Api.attach = (server, app) => {
   });
 
   app.get('/jobs/:id/import', (req, res) => {
-    const args = ['workspace', 'import', req.query.reference];
+    const args = ['import', req.query.reference];
     startNewCliTask(req.params.id, args, (error, task) => {
       if (error) {
         res.status(404);
