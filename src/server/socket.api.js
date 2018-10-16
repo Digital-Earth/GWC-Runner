@@ -213,6 +213,8 @@ Api.attach = (server, app) => {
   Api.attachEndpointsNamespace(io.of('/endpoint'));
 
   Api.attachRestAPI(app);
+
+  return io;
 };
 
 

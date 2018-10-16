@@ -29,7 +29,7 @@ const defaults = {
   type: 'node',
   nodePort: 4000,
   deployments: 'c:\\GGS\\deployments',
-  dataPath: 'c:\\GGS\\data',
+  dataPath: 'c:\\GGS\\gallery',
   cachePath: 'c:\\GGS\\cache',
   nodePath: '',
   rootPath: process.cwd(),
@@ -107,6 +107,14 @@ const setup = async () => {
     }]);
 
   console.log(config);
+
+  if (!fs.existsSync(config.dataPath)) {
+    fs.mkdirSync(config.dataPath);
+  }
+
+  if (!fs.existsSync(config.cachePath)) {
+    fs.mkdirSync(config.cachePath);
+  }
 
   fs.writeFileSync('node.config.json', beautify(config, null, 2, 50));
 };

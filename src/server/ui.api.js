@@ -1,7 +1,5 @@
 const fs = require('fs');
 const ms = require('ms');
-const socketIo = require('socket.io');
-const parseArgs = require('minimist');
 const serverContext = require('./ServerContext');
 const Job = require('./Job');
 const DeploymentJob = require('./DeploymentJob');
@@ -10,21 +8,16 @@ const createGwcDetails = require('./jobs/gwc');
 
 const activeDeploymentFile = 'cluster.config.json';
 
-const Api = require('./socket.api.js');
+const Api = require('./socket.api');
+
+const oldAttach = Api.attach;
 
 Api.attach = (server, app) => {
-  const options = parseArgs(process.argv);
-  console.log('setup socket.io API');
-
-  const io = socketIo(server);
-
-
   if (fs.existsSync(activeDeploymentFile)) {
     Api.activeDeployment = JSON.parse(fs.readFileSync(activeDeploymentFile, 'utf8'));
   }
 
-  Api.attachNodesNamespace(io.of('/node'), options);
-  Api.attachEndpointsNamespace(io.of('/endpoint'), options);
+  const io = oldAttach(server, app);
 
   function transformTask(task) {
     return {
@@ -237,9 +230,6 @@ Api.attach = (server, app) => {
 
     /* END - ALL LEGACY STUFF */
   });
-
-
-  Api.attachRestAPI(app);
 
   Api.findJob = (jobIdOrName) => {
     function jobFilter(job) {

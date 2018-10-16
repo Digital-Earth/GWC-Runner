@@ -42,8 +42,8 @@ export default {
       nav: true,
       items: [
         { title: "Home", icon: "home", href: "/" },
-        { title: "DataSets", icon: "link", href: "/datasets" },
-        { title: "GeoSources", icon: "folder", href: "/geosources"},
+        //{ title: "DataSets", icon: "link", href: "/datasets" },
+        //{ title: "GeoSources", icon: "folder", href: "/geosources"},
         { title: "Deployments", icon: "cloud_download", href: "/deployments"},
         { title: "Jobs", icon: "playlist_play", href: "/jobs" }
       ]

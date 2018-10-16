@@ -60,7 +60,7 @@ if (process.env.NODE_ENV === 'production') {
 const server = new http.Server(app);
 
 // install socket.io api
-const api = require('./server/api');
+const api = require('./server/ui.api');
 
 api.attach(server, app);
 
