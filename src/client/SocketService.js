@@ -33,6 +33,12 @@ export default {
 
     socket.on('nodes', (nodes) => {
       store.state.nodes = nodes;
+      store.state.totalCpu = 0;
+      store.state.totalMemory = 0;
+      for (const node of store.state.nodes) {
+        store.state.totalCpu += node.config.cpus;
+        store.state.totalMemory += node.config.mem;
+      }
     });
 
     socket.on('job-update', (jobUpdate) => {

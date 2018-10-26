@@ -9,6 +9,8 @@ const state = {
   urls: [],
   geoSources: [],
   nodes: [],
+  totalCpu: 0,
+  totalMemory: 0,
   jobs: [],
   jobTasks: {},
   tasks: [],

@@ -1,55 +1,6 @@
 <template>
 	<div class="home">
     <v-container grid-list-md text-xs-center>
-      <v-layout row wrap text-xl-left>
-          <v-flex xs12>
-              <h1>Services</h1>
-          </v-flex>
-      </v-layout>
-
-      <v-layout row wrap>
-          <v-flex xs4>
-              <v-card dark color="secondary" hover height="100%">
-                  <v-card-title primary-title >
-                      <div class="headline text-xs-center">Cluster</div>
-                  </v-card-title>
-                  <v-card-text class="px-0">
-                      <div class="display-3">
-                          {{state.connected?'connected':'disconnected'}}
-                      </div>
-                  </v-card-text>
-              </v-card>
-          </v-flex>
-
-
-          <v-flex xs4>
-              <v-card dark color="secondary" hover height="100%">
-                  <v-card-title primary-title >
-                      <div class="headline text-xs-center">Deployment</div>
-                  </v-card-title>
-                  <v-card-text class="px-0">
-                      <div class="display-3">
-                        <span v-if="state.deployment">{{state.deployment.name}} {{state.deployment.version}}</span>
-                        <span v-else>No Active deployment set</span>
-                      </div>
-                  </v-card-text>
-              </v-card>
-          </v-flex>
-
-          <v-flex xs4>
-              <v-card dark color="secondary" hover height="100%">
-                  <v-card-title primary-title >
-                      <div class="headline text-xs-center">Status</div>
-                  </v-card-title>
-                  <v-card-text class="px-0">
-                      <div class="display-3">
-                          <toggle-button @change="toggleRunning" :sync="true" :value="running"></toggle-button>{{running?"Running":"Idle"}}
-                      </div>
-                  </v-card-text>
-              </v-card>
-          </v-flex>
-
-      </v-layout>
 
       <v-layout row wrap text-xl-left>
           <v-flex xs12>
@@ -58,6 +9,36 @@
       </v-layout>
 
       <v-layout row wrap>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Deployment</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-2">
+                <span v-if="state.deployment">{{state.deployment.name}} {{state.deployment.version}}</span>
+                <span v-else>No Active deployment set</span>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
+
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Status</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-2">
+                <span>{{running?"Running":"Idle"}}</span>
+                <v-btn :color="running?'red':'success'" large @click="toggleRunning">
+                  <span>{{running?"Stop":"Start"}}</span><v-icon right large>{{running?'stop':'play_arrow'}}</v-icon>
+                </v-btn>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
+
         <v-flex xs4>
           <v-card dark color="secondary" hover height="100%">
             <v-card-title primary-title >
@@ -153,6 +134,19 @@
 
     <v-layout row wrap>
       <v-flex xs4>
+        <v-card dark color="secondary" hover height="100%">
+          <v-card-title primary-title >
+            <div class="headline text-xs-center">Cluster</div>
+          </v-card-title>
+          <v-card-text class="px-0">
+            <div class="display-3">
+              {{state.connected?'connected':'disconnected'}}
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-flex>
+
+      <v-flex xs2>
         <v-card dark color="secondary" hover height="100%" to="/cluster">
           <v-card-title primary-title >
             <div class="headline text-xs-center">Nodes</div>
@@ -163,7 +157,7 @@
         </v-card>
       </v-flex>
 
-      <v-flex xs4>
+      <v-flex xs2>
         <v-card dark color="secondary" hover height="100%" to="/cluster">
           <v-card-title primary-title >
             <div class="headline text-xs-center">Jobs</div>
@@ -174,13 +168,32 @@
         </v-card>
       </v-flex>
 
-      <v-flex xs4>
+      <v-flex xs2>
         <v-card dark color="secondary" hover height="100%" to="/cluster">
           <v-card-title primary-title >
             <div class="headline text-xs-center">Tasks</div>
           </v-card-title>
           <v-card-text class="px-0">
             <div class="display-4">{{runningTasks}}</div>
+          </v-card-text>
+        </v-card>
+      </v-flex>
+
+      <v-flex xs2>
+        <v-card dark color="secondary" hover height="100%" to="/cluster">
+          <v-card-title primary-title >
+            <div class="headline text-xs-center">Usage</div>
+          </v-card-title>
+          <v-card-text class="px-0">
+            <div class="usage-bar">
+              CPU
+              <div class="bar cpu" :style="{height:cpu +'%'}"></div>
+            </div>
+
+            <div class="usage-bar">
+              MEM
+              <div class="bar mem" :style="{height:memory +'%'}"></div>
+            </div>
           </v-card-text>
         </v-card>
       </v-flex>
@@ -262,8 +275,8 @@ export default {
     }
   },
   methods: {
-    toggleRunning(event) {
-      if (event.value) {
+    toggleRunning() {
+      if (!this.running) {
         this.$socket.emit("start-deployment");
       } else {
         this.$socket.emit("stop-deployment");
@@ -399,6 +412,24 @@ export default {
       });
       return count;
     },
+    cpu: function() {
+      let cpu = 0;
+      this.state.tasks.forEach(task => {
+        if (task.status != "done") {
+          cpu += task.usage.cpu;
+        }
+      });
+      return cpu / this.state.totalCpu;
+    },
+    memory: function() {
+      let memory = 0;
+      this.state.tasks.forEach(task => {
+        if (task.status != "done") {
+          memory += task.usage.memory;
+        }
+      });
+      return memory / (1024 * 1024 * 1024 * this.state.totalMemory) * 100;
+    },
     endpoints: function() {
       let endpoints = {};
       this.state.tasks.forEach(task => {
@@ -434,4 +465,31 @@ export default {
 .graph.big {
   height: 160px;
 }
+
+.usage-bar {
+  display: inline-block;
+  position: relative;
+  height: 100px;
+  background: #666;
+  border-radius: 10px;
+  overflow: hidden;
+  width: 50px;
+  margin: 0px 20px;
+}
+
+.usage-bar .bar {
+  position: absolute;
+  width: 100%;
+  bottom: 0;
+
+}
+
+.usage-bar .bar.cpu {
+background: #ffc107;
+}
+
+.usage-bar .bar.mem {
+background: #07ffa5;
+}
+
 </style>
