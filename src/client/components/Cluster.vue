@@ -15,7 +15,6 @@
 				<task class="task" v-for="task in state.jobTasks[job.id]" v-bind:key="task.id" v-bind:task="task" v-on:close="removeTask(task)"></task>
 			</div>
 		</div>
-
 	</div>
 </template>
 
@@ -61,7 +60,7 @@ export default {
 			store.clearAllDone();
 		},
 		removeTask(taskToRemove) {
-			if (taskToRemove.status == 'done' || taskToRemove.status == 'lost')  {							
+			if (taskToRemove.status == 'done' || taskToRemove.status == 'lost')  {
 				for(var i=0;i<this.state.tasks.length;i++) {
 					var task = this.state.tasks[i];
 					if (task.id === taskToRemove.id) {
@@ -72,7 +71,7 @@ export default {
 			} else {
 				//send kill command
 				this.$socket.emit('kill-task',taskToRemove.id);
-			} 
+			}
 		},
 		killJob(jobToRemove) {
 			if (jobToRemove.status == 'running') {
@@ -130,7 +129,7 @@ export default {
 	transition: all 0.2s ease-in-out;
 	border: 1px solid transparent;
 	padding: 0px 10px;
-} 
+}
 
 .job-info .job-header:hover button.close {
 	border: 1px solid #888;
