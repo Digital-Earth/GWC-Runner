@@ -1,3 +1,4 @@
+const fs = require('fs');
 const parseArgs = require('minimist');
 const Repo = require('../server/Repo');
 const config = require('../server/config');
@@ -20,7 +21,7 @@ module.exports = () => {
   }
 
   if ((!options.p && !options.d) || options._.length !== 1) {
-    console.log('usage: node ggs.js upload [-p=gwc|-d=cluster] [-v=1.2.3] folder');
+    console.log('usage: node ggs.js upload [-p=cli|-d=cluster] [-v=1.2.3] [-u=deployment/deployment.json] folder');
     return;
   }
 
@@ -40,6 +41,14 @@ module.exports = () => {
         console.log(error);
       } else {
         console.log(result);
+        if (options.u) {
+          const json = JSON.parse(fs.readFileSync(options.u));
+          if (json && json.products && options.p in json.products) {
+            console.log('found product in deployment, update the new version in deployment file');
+            json.products[options.p].version = result.version;
+            fs.writeFileSync(options.u, JSON.stringify(json, null, 2));
+          }
+        }
       }
     });
   }

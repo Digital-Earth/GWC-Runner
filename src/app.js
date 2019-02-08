@@ -5,9 +5,9 @@ const parseArgs = require('minimist');
 const config = require('./server/config');
 const serverContext = require('./server/ServerContext');
 
-const PORT = process.env.PORT || 8080;
-
 const options = parseArgs(process.argv);
+
+const PORT = options.port || process.env.PORT || 8080;
 
 const nodeConfig = require('./nodeConfig');
 

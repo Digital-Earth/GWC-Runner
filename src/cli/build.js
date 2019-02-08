@@ -22,7 +22,9 @@ module.exports = () => {
       case 'spec':
       case 'cluster.config.json':
       case 'node.config.json':
+      case 'node2.config.json':
       case 'node.master.config.json':
+      case 'run2.bat':
       case 'GWC-Runner.zip':
         return;
 
