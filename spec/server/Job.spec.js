@@ -37,6 +37,17 @@ serverContext.cluster = {
 	tasks() {
 		return Object.values(this._tasks);
 	},
+	completeSingleTask() {
+		for (task of this.tasks()) {
+			if (task.status == 'new') {
+				task.mutateStatus('running');
+			}
+			if (task.status == 'running') {
+				task.mutateStatus('done')
+				return;
+			}
+		}
+	},
 	completeAllTasks() {
 		for (task of this.tasks()) {
 			if (task.status == 'new') {
@@ -46,6 +57,9 @@ serverContext.cluster = {
 				task.mutateStatus('done')
 			}
 		}
+	},
+	nodes() {
+		return [{id:'node-1'},{id:'node-2'}];
 	}
 }
 
@@ -344,5 +358,21 @@ describe('Job', function () {
 		expect(job.status).toEqual('done');
 
 		expect(job.result.id).toEqual(2);
+	});
+
+	it('job.run on all nodes invoke task for each node', function() {
+		let job = new Job('job');
+		
+		job.forEachNode('*',{}).complete();
+
+		job.start();
+		serverContext.cluster.completeSingleTask();
+
+		expect(job.status).toEqual('running');
+
+		serverContext.cluster.completeSingleTask();
+
+		expect(job.status).toEqual('done');
+		expect(job.result.length).toEqual(2);
 	});
 });

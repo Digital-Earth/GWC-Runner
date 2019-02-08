@@ -1,9 +1,9 @@
 <template>
 	<div class="task">
 		<div class="header" v-bind:class="{ running: task.status == 'running' , 'high-cpu': task.usage.cpu > 50 }" @click="expanded = !expanded">
-			<span class="section type">Node {{task.node}}</span>
+			<span class="section type">N #{{taskNode}}</span>
 			<span class="section id">{{task.job || task.id}}</span>
-			<span class="section type">{{task.info.type}}</span>
+			<span class="section type">{{task.details.service || 'task' }}</span>
 			<span class="section type">{{task.status}}</span>
 			<span class="section stat">
 				<span v-if="task.status == 'running'">
@@ -23,7 +23,7 @@
 			<div v-for="(value,key) in task.info" v-bind:key="key">{{key}} = {{value}}</div>
 		</div>
 		<div class="details log" v-if="expanded">
-			<div v-for="line in task.log">{{line}}</div>
+			<div v-for="(line,index) in task.log" :key="index">{{line}}</div>
 		</div>
 	</div>
 </template>
@@ -49,6 +49,12 @@ export default {
 			if (this.task.usage.idleFrom) {
 				return (Date.now() - new Date(this.task.usage.idleFrom))/1000/60;
 			}
+		},
+		taskNode () {
+			if (this.task.details && this.task.details.node) {
+				return this.task.details.node.substr(0,6);
+			}
+			return '';
 		}
 	},
 	filters: {
@@ -127,6 +133,13 @@ export default {
 	position: absolute;
 	right: 10px;
 	top: 10px;
+	border: 1px solid transparent;
+	transition: all 0.2s ease-in-out;
+	padding: 0px 10px;
+}
+
+.task .header:hover button.close {
+	border: 1px solid #888;
 }
 
 .task .progress {

@@ -1,0 +1,66 @@
+{
+  "variables": {
+    "crawler-db-connection-string": "mongodb://pyxis:QgGaZXx4hSMm2tXkZOca655u76QrcG0YP8KcS5xxWv7vxKWkplLPKoEPEvpe1bLcRAz1JqCwLkpfF2WyT691FA==@pyxis.documents.azure.com:10255/?ssl=true&replicaSet=globaldb",
+    "gwc-server-start-port": 63000,
+    "proxy-port": "1337",
+    "ui-port": "62000",
+    "gwc-server-count": 8
+  },
+  "products": {
+    "cli": {
+      "product": "cli",
+      "version": "1.0.27",
+      "setup": "pyx.exe config \"-mongo=${crawler-db-connection-string}\""
+    },
+    "ui": {
+      "product": "ui",
+      "version": "1.0.20",
+      "setup": "npm i"
+    },
+    "proxy": {
+      "product": "proxy",
+      "version": "1.0.11",
+      "setup": "npm i"
+    }
+  },
+  "services": {
+    "cli": {
+      "product": "cli",
+      "exec": "pyx.exe"
+    },
+    "ui": {
+      "product": "ui",
+      "exec": "${nodePath}",
+      "env": {
+        "PORT": "${ui-port}"
+      },
+      "args": [
+        "server.js"
+      ],
+      "instances": "1"
+    },
+    "server": {
+      "product": "cli",
+      "exec": "pyx.exe",
+      "args": [
+        "serve",
+        "-cwd=${dataPath}",
+        "-all",
+        "-host=http://${ip}:${gwc-server-start-port}+"
+      ],
+      "instancesPerNode": "${gwc-server-count}"
+    },
+    "proxy": {
+      "product": "proxy",
+      "version": "1.0.4",
+      "exec": "${nodePath}",
+      "env": {
+        "PORT": "${proxy-port}"
+      },
+      "args": [
+        "server.js"
+      ],
+      "instancesPerNode": 1
+    }
+  }
+}

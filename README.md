@@ -8,19 +8,41 @@
 # install dependencies
 npm install
 
-# run root cluster node. by default it will start at localhost:8081. 
-npm run root
+# setup the node, this will prompt several questions for you to set things up
+ggs setup
 
-# run slave cluster node (for task execution). by default it will connect to localhost:8081
-npm run node
-# you can run this several times to setup new nodes
-npm run node
+# please note that if you are not running the node on elevation permissions (admin)
+# you will need to run those commands
+netsh http add urlacl url=http://*:63000/ user=[your-user]
+netsh http add urlacl url=http://*:63001/ user=[your-user]
+netsh http add urlacl url=http://*:63002/ user=[your-user]
+netsh http add urlacl url=http://*:63003/ user=[your-user]
+netsh http add urlacl url=http://*:63004/ user=[your-user]
+netsh http add urlacl url=http://*:63005/ user=[your-user]
+netsh http add urlacl url=http://*:63006/ user=[your-user]
+netsh http add urlacl url=http://*:63007/ user=[your-user]
+netsh http add urlacl url=http://*:64000/ user=[your-user]
 
-# serve with hot reload at localhost:8080. connecting by default to cluster root at localhost:8081 
+# run slave cluster node (for task execution).
+ggs serve
+# you can run this several times to setup new nodes with different nodes
+ggs serve node --port 1234
+
+# serve with hot reload at localhost:8080 and setup a local node
 npm run dev
 
+# serve with hot reload at localhost:88080 and connect to cluster master node
+ggs ui --cluster http://localhost:4000
+
 # build for production with minification
-npm run build
+ggs build
+
+# for production server, you might want to install it as a service
+
+ggs service install
+
+# if this is the main server, you might want to enable UI as well (port 8080)
+ggs service install --ui
 
 ```
 
@@ -33,54 +55,77 @@ Therefore, we decided to build a small task-manager. however, to make it to work
 
 ### Cluster Node
 
-```npm run node```
+```ggs serve```
 
-this is a simple task manager node. it able to download binaries from our repo and execute tasks.
+this is a simple task manager node. it able to download deployments repo and execute tasks.
 
 this node connected using socket.io to root-node to stream task progress and also to get commands to start and kill tasks.
 
 ### Root Node
 
-```npm run root```
+```gss serve --config your-node.config.json --local```
 
-this is the root node of the cluster (currently single point of failure, in the future I see Root Node and Cluster Node merging).
+change the node.config.json to ```{ type: "master"}``` to enable the node to expose the socket.io to control the cluster and server as a master node.
+mroeover, use ```--local``` options to start enable the root node to act a task manager as well.
 
-This node currently doesn't run a local-task-manager, but depends on Cluster Nodes to connect to it using socket.io. Once a Cluster node is connected it will be added to cluster and tasks creation jobs will be sent to it.
+the root node provide socket.io api:
+1) /node - to allow remote nodes to connect to the cluster
+2) /cluster - to allow remote UI/API to start and kill tasks on the cluster
+3) /endpoint - to allow remote API to discover endpoints on the cluster
 
-the root node provide several socket.io name spaces:
-1) /node - for cluster node to connect to.
-2) /app - for app nodes to connect to.
-
-the root node provide rest api:
+also, the root node provide rest api:
 1) /nodes - return list of nodes on the cluster
 2) /tasks - return list of tasks on the cluster
-3) /endpoints - return list of all tasks endpoints
+3.1) /endpoints - return list of all tasks endpoints
+3.2) /endpoints/service/endpoint-name - return list of all endpoints for a given service and endpoint name
 
 ### UI
 
 ```npm run dev```
+or
+
+```ggs ui --local```
 
 run a Vue+webpack ui to track the state of a cluster.
-this server connects to a Root Node and display the current state of the cluster.
+this server can act as a root-node or it connect to remote root-node by using ```--cluster root-node-url```
 
-### APP
+## Local Development
 
-```npm run ?```
+to use cluster you need to set an active deployment. an active deployment will download published binaries for execution.
+However, this is not the right tool for local development and debugging.
 
-In development.
+Therefore, you can add the following to node.config.json:
 
-App is a node script that connects to a Root Node cluster and trigger tasks.
+### Override specific product path
+```
+{
+  "dev": {
+		"products": {
+			"product-name": "product-path"
+			"gwc": "c:\\work\\trunk\\application\\GeoWebCore\\bin\\Release",
+		}
+	}
+}
 
-For example, we can have a GWC App that invoke GWC instances.
-we can have a Crawler App that invoke auto discover tasks.
+```
 
-The goal of separating an App from UI and Root is to enable developers to connect to local or remote clusters. And they can always start up an App process that will start tasks and kill tasks if that App process was disconnected from the Cluster.
+this would override the location (cwd) for specific products
 
-In production. we probably have a UI that start the default apps like GWC and Crawler and LB.
+### Override deployment information
 
-App is defined by an Id (guid). App can also have a name. name is used by cluster LB to forward requests:
+```
+{
+  "dev": {
+		"deployments": [{
+			name: "dev-cluster",
+			version: "1.0.0"
+			path: "c:\\work\\testing\\deployment.json"
+		},{
+			another...
+		}]
+	}
+}
 
-```http://[app-name].cluster/[task-name]/``` will forward requests to a specific task in a specific app.
-```http://cluster/[app-name-or-id]/[task-name-or-id]/``` will also forward requests to a specific task in a specific app.
+```
 
-This allow us to do hot-swap between apps without downtime.
+this would be added to deployment details of the local node

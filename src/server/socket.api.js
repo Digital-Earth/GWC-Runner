@@ -1,185 +1,221 @@
-let serverContext = require('./ServerContext');
-var Job = require('./Job');
-var config = require('./config');
-var debounce = require('debounce');
+const debounce = require('debounce');
+const serverContext = require('./ServerContext');
+const config = require('./config');
+const parseArgs = require('minimist');
 
-const { ClusterTaskManager, LocalTaskManager } = require('./TaskManager');
-
-var Api = {}
-
-Api.attachNodesNamespace = function(io, options) {
-	options = options || {};
-	serverContext.api = Api;
-	serverContext.config = config;
-	serverContext.cluster = new ClusterTaskManager(io);
-	if (options.local) {
-		serverContext.cluster.addNode('local', new LocalTaskManager());
-	}
+const { ClusterTaskManager, RemoteTaskManager, LocalTaskManager } = require('./TaskManager');
+const TaskResolver = require('./TaskResolver');
 
 
-	serverContext.cluster.on('new-task', (task) => console.log('new-task',task));
-	serverContext.cluster.on('kill-task', (task) => console.log('kill-task',task))
-	serverContext.cluster.on('task-end', (task) => console.log('task-end',task))
+const Api = {};
 
-	serverContext.cluster.on('node-connected', (node) => console.log('node-connected',node))
-	serverContext.cluster.on('node-disconnected', (node) => console.log('node-disconnected',node))
-}
+Api.attachNodesNamespace = (io, options) => {
+  /* eslint-disable no-param-reassign */
+  options = options || {};
+  serverContext.api = Api;
+  serverContext.config = config;
+  serverContext.cluster = new ClusterTaskManager(io);
 
-Api.attachRestAPI = function(app) {
-	//rest API
-	app.get('/nodes', function (req, res) {
-		res.send(JSON.stringify(serverContext.cluster.nodes()));
-		res.end();
-	});
+  if (options.cluster) {
+    /* eslint-disable global-require */
+    const socketClient = require('socket.io-client');
+    const cluster = socketClient(`${options.cluster}/cluster`);
+    serverContext.cluster.addNode('cluster', new RemoteTaskManager(cluster));
+  }
 
-	app.get('/tasks', function (req, res) {
-		res.send(JSON.stringify(serverContext.cluster.tasks()));
-		res.end();
-	});
+  if (options.local) {
+    const taskResolver = new TaskResolver(serverContext.nodeConfig);
+    const localConfig = {
+      resolveDetails: (details, callback) => taskResolver.resolveDetails(details, callback),
+      info: {
+        name: `${serverContext.nodeConfig.ip}:${serverContext.nodeConfig.nodePort}`,
+        config: serverContext.nodeConfig,
+      },
+    };
+    serverContext.cluster.addNode('local', new LocalTaskManager(null, localConfig));
+  }
 
-	/*
+  if (options.trace) {
+    serverContext.cluster.on('new-task', task => console.log('new-task', task));
+    serverContext.cluster.on('kill-task', task => console.log('kill-task', task));
+    serverContext.cluster.on('task-end', task => console.log('task-end', task));
+  }
 
-	TODO: change job tracking API to allow get endpoints by app/job/task-name/
-	
-	app.get('/jobs/:id', function (req, res) {
-		let job = serverContext.jobs.filter(job => job.id == req.params.id || job.name == req.params.id)[0];
-		if (job) {
-			res.send(JSON.stringify(transformJob(job)));
-			res.end();
-		} else {
-			res.status(404);
-			res.send('Job ' + req.params.id + ' not found');
-			res.end();
-		}
-	});
+  serverContext.completedTasks = {};
+  function addCompletedTasks(task) {
+    serverContext.completedTasks[task.id] = task;
+    const timeToKeepInDictionary = 5 * 60 * 1000;
+    setTimeout(() => {
+      delete serverContext.completedTasks[task.id];
+    }, timeToKeepInDictionary);
+  }
+  serverContext.cluster.on('task-end', addCompletedTasks);
 
-	app.get('/jobs', function (req, res) {
-		res.send(JSON.stringify(serverContext.jobs.map(transformJob)));
-		res.end();
-	});
-	*/
-}
+  serverContext.cluster.on('node-connected', node => console.log('node-connected', node.id, `${node.config.ip}:${node.config.nodePort}`));
+  serverContext.cluster.on('node-disconnected', node => console.log('node-disconnected', node.id, `${node.config.ip}:${node.config.nodePort}`));
+};
 
-Api.attach = function (server, app) {
-	console.log('setup socket.io API');
+Api.attachRestAPI = (app) => {
+  // rest API
+  app.get('/nodes', (req, res) => {
+    res.send(JSON.stringify(serverContext.cluster.nodes()));
+    res.end();
+  });
 
-	var io = require('socket.io')(server);
+  app.get('/tasks', (req, res) => {
+    res.send(JSON.stringify(serverContext.cluster.tasks()));
+    res.end();
+  });
+
+  app.get('/tasks/:taskId', (req, res) => {
+    let task;
+    if (req.params.taskId in serverContext.completedTasks) {
+      task = serverContext.completedTasks[req.params.taskId];
+    } else {
+      task = serverContext.cluster.getTaskById(req.params.taskId);
+    }
+    if (task == null) {
+      res.status(404);
+      res.send(`Task ${req.params.taskId} not found`);
+      res.end();
+    } else {
+      res.send(JSON.stringify({
+        id: task.id,
+        name: task.name,
+        status: task.status,
+        endpoints: task.endpoints,
+        details: task.details,
+        state: task.state,
+        log: task.log,
+        data: task.data,
+      }));
+    }
+  });
+
+  app.get('/endpoints', (req, res) => {
+    const endpoints = serverContext.cluster.tasks()
+      .filter(task => Object.keys(task.endpoints).length > 0)
+      .map(task => ({ endpoints: task.endpoints, details: task.details, state: task.state }));
+    res.send(JSON.stringify(endpoints));
+    res.end();
+  });
+
+  app.get('/endpoints/:service/:endpoint', (req, res) => {
+    const endpoints = [];
+    if (req.params.service === 'master' && req.params.endpoint === 'api') {
+      endpoints.push(serverContext.nodeConfig.master);
+    } else {
+      serverContext.cluster.tasks()
+        .filter(task =>
+          (req.params.endpoint in task.endpoints) &&
+          task.details.service === req.params.service)
+        .forEach(task => endpoints.push(task.endpoints[req.params.endpoint]));
+    }
+    res.send(JSON.stringify(endpoints));
+    res.end();
+  });
+};
+
+Api.attachEndpointsNamespace = (io) => {
+  let currentEndpoints = {};
+
+  function buildEndpoints() {
+    const endpoints = {};
+
+    // collect new endpoints
+    for (const task of serverContext.cluster.tasks()) {
+      const names = Object.keys(task.endpoints);
+      if (names.length > 0) {
+        const service = task.details.service || task.state.type;
+        if (!(service in endpoints)) {
+          endpoints[service] = {};
+        }
+
+        const serviceEndpoints = endpoints[service];
+
+        for (const name of names) {
+          if (!(name in serviceEndpoints)) {
+            serviceEndpoints[name] = [];
+          }
+          serviceEndpoints[name].push(task.endpoints[name]);
+        }
+      }
+    }
+
+    // sort endpoints
+    for (const service in endpoints) {
+      for (const name in endpoints[service]) {
+        endpoints[service][name].sort();
+      }
+    }
+
+    // add master endpoint
+    endpoints.master = { api: [serverContext.nodeConfig.master] };
+
+    return endpoints;
+  }
+
+  function findChanges(newEndpoints, oldEndpoints) {
+    const services = Object.keys(newEndpoints).concat(Object.keys(oldEndpoints));
+    const changes = {};
+
+    for (const service of services) {
+      if (service in newEndpoints) {
+        // service found in new endpoints
+        if (service in oldEndpoints) {
+          // and also in the old endpoint, check if there wasa change
+          if (JSON.stringify(newEndpoints[service]) !== JSON.stringify(oldEndpoints[service])) {
+            changes[service] = newEndpoints[service];
+          }
+        } else {
+          // this is a new service
+          changes[service] = newEndpoints[service];
+        }
+      } else if (service in oldEndpoints) {
+        // remove all information about this service
+        changes[service] = {};
+      }
+    }
+
+    return changes;
+  }
 
 
-	Api.attachNodesNamespace(io.of('/node'));
-	serverContext.cluster.expose(io.of('/app'));
+  let emitNewEndpoints = () => {
+    const newEndpoints = buildEndpoints();
+    const changes = findChanges(newEndpoints, currentEndpoints);
+    console.log(changes);
+    currentEndpoints = newEndpoints;
+    io.emit('endpoints', changes);
+  };
 
-	Api.attachRestAPI(app);
+  emitNewEndpoints = debounce(emitNewEndpoints, 500);
 
-	/*
+  io.on('connect', (client) => {
+    client.emit('endpoints', currentEndpoints);
+  });
 
-	TODO: change job tracking API to allow get endpoints by app/job/task-name/
+  serverContext.cluster.on('mutate', (task, mutate) => {
+    if (mutate.type === 'endpoints' || mutate.type === 'status') {
+      emitNewEndpoints();
+    }
+  });
+};
 
-	serverContext.jobs = [];
+Api.attach = (server, app) => {
+  /* eslint-disable global-require */
+  console.log('setup socket.io API');
 
-	Api.trackJob = function (job) {
-		job.on('start', function () {
-			serverContext.jobs.push(job);
-			serverContext.emit('job',job);
-		});
+  const io = require('socket.io')(server);
 
-		job.state.on('mutate', function () {
-			serverContext.emit('job',job);
-		});
+  Api.attachNodesNamespace(io.of('/node'), parseArgs(process.argv));
+  serverContext.cluster.expose(io.of('/cluster'));
+  Api.attachEndpointsNamespace(io.of('/endpoint'));
 
-		job.on('done', function () {
-			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
-			serverContext.emit('job',job);
-		});
+  Api.attachRestAPI(app);
 
-		job.on('cancelled', function () {
-			serverContext.jobs.splice(serverContext.jobs.indexOf(job), 1);
-			serverContext.emit('job',job);
-		});
-	}
-
-	serverContext.cluster.on('new-task', sendTaskUpdate);
-	serverContext.cluster.on('task-end', sendTaskUpdate);
-	serverContext.cluster.on('mutate', sendTaskUpdate);
-
-	serverContext.cluster.on('new-node', sendCluster);
-	serverContext.cluster.on('node-detach', sendCluster);
-
-	io.on('connection', (socket) => {
-		console.log('connected')
-
-		sendInitialUpdate();
-
-		socket.on('kill-task', function (taskId) {
-			serverContext.cluster.killTaskById(taskId);
-		});
-
-		socket.on('new-task', function(taskDetails) {
-			serverContext.cluster.start(taskDetails);
-		});
-
-		socket.emit('tasks', serverContext.cluster.tasks());
-		socket.emit('nodes', serverContext.cluster.nodes());
-	});
-	*/
-	//job track api
-
-	let jobSocket = io.of('/job');
-
-	let jobTrackClients = [];
-
-	jobSocket.on('connection', function(socket) {
-		let trackList = [];
-
-		let emit = debounce(function(job) {
-			client.socket.emit('job-update',transformJob(job));
-		},100);
-
-		let client = {
-			socket,
-			emit,
-			isTracking(job) {
-				return trackList.indexOf(job.id) !== -1 || trackList.indexOf(job.name) !== -1;
-			}
-		};
-
-		socket.on('start-tracking',function(id) {
-			let index = trackList.indexOf(id);
-			if (index == -1) {
-				trackList.push(id);
-
-				//send current state if we are tracking this job
-				for(let job of serverContext.jobs) {
-					if (job.id == id || job.name == id) {
-						client.emit(job);
-					}
-				}
-			};
-		});
-		socket.on('stop-tracking', function(id) {
-			let index = trackList.indexOf(id);
-			if (index != -1) {
-				trackList.splice(index,1);
-			}
-		});
-
-		socket.on('disconnect', function() {
-			jobTrackClients.splice(jobTrackClients.indexOf(client),1);
-		});
-
-		jobTrackClients.push(client);
-	});
-
-	serverContext.on('job', function(job) {
-		for(let client of jobTrackClients) {
-			if (client.isTracking(job)) {
-				client.emit(job);
-			}
-		}
-	});
-
-	
-}
+  return io;
+};
 
 
 module.exports = Api;

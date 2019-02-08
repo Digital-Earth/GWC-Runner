@@ -3,11 +3,11 @@
 		<v-app id="runner" dark>
 			<v-toolbar app fixed>
 				<v-toolbar-side-icon @click="nav=!nav"></v-toolbar-side-icon>
-			  <v-toolbar-title>Global Grid Systems Crawler</v-toolbar-title>
+			  <v-toolbar-title>Global Grid Systems</v-toolbar-title>
         <v-spacer></v-spacer>
         <img src="./assets/logo.png" width="120px">
 			</v-toolbar>
-			
+
 			<v-navigation-drawer app fixed v-model="nav">
 				<v-list>
 					<v-list-tile v-for="item in items" :key="item.title" :to="item.href" exact>
@@ -21,7 +21,7 @@
 					</v-list-tile>
 				</v-list>
 			</v-navigation-drawer>
-			
+
 			<v-content>
 				<v-container fluid>
 					<router-view></router-view>
@@ -42,9 +42,10 @@ export default {
       nav: true,
       items: [
         { title: "Home", icon: "home", href: "/" },
-        { title: "Cluster", icon: "playlist_play", href: "/cluster" },
-        { title: "DataSets", icon: "link", href: "/datasets" },
-        { title: "GeoSources", icon: "folder", href: "/geosources"}
+        //{ title: "DataSets", icon: "link", href: "/datasets" },
+        //{ title: "GeoSources", icon: "folder", href: "/geosources"},
+        { title: "Deployments", icon: "cloud_download", href: "/deployments"},
+        { title: "Jobs", icon: "playlist_play", href: "/jobs" }
       ]
     };
   },
@@ -59,7 +60,7 @@ export default {
   },
   methods: {
     displayCount(item) {
-      if (item.title == "Cluster") {
+      if (item.title == "Jobs") {
         return this.runningTasks;
       } else {
         return "";

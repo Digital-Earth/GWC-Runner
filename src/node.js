@@ -1,44 +1,59 @@
 const http = require('http');
 const express = require('express');
-const path = require('path');
 const getPort = require('get-port');
 const io = require('socket.io-client');
-const { MutableState } = require('./server/MutableState');
-const Task = require('./server/Task');
-const {LocalTaskManager} = require('./server/TaskManager');
 
+const { LocalTaskManager } = require('./server/TaskManager');
+const TaskResolver = require('./server/TaskResolver');
+const serverContext = require('./server/ServerContext');
+
+const nodeConfig = require('./nodeConfig');
+
+console.log(nodeConfig);
+serverContext.nodeConfig = nodeConfig;
+
+// start server
 const app = express();
-
-if (process.env.NODE_ENV === 'production') {
-	//upgrade config to production
-	var config = require('./server/config.production');
-
-	console.log(config);
-} else {
-	var config = require('./server/config');
-}
 
 const server = new http.Server(app);
 
-const master = process.argv[2] || 'http://localhost:8081';
+if (nodeConfig.type === 'master') {
+  /* eslint-disable global-require */
+  // install socket.io api
+  const api = require('./server/socket.api');
+  api.attach(server, app);
+} else {
+  const { master } = nodeConfig;
+  console.log(`master: ${master}`);
+  const masterClient = io(`${master}/node`);
 
-console.log('master: ' + master);
+  const taskResolver = new TaskResolver(nodeConfig);
+  const localConfig = {
+    resolveDetails: (details, callback) => taskResolver.resolveDetails(details, callback),
+    info: {
+      name: `${serverContext.nodeConfig.ip}:${serverContext.nodeConfig.nodePort}`,
+      config: serverContext.nodeConfig,
+    },
+  };
 
-const masterClient = io(master+"/node");
+  server.taskManager = new LocalTaskManager(masterClient, localConfig);
 
-const manager = new LocalTaskManager(masterClient);
+  masterClient.on('connect', () => {
+    console.log('connected to master', master);
+  });
 
-masterClient.on('connect',function() {
-	console.log('connected to master', master);
+  masterClient.on('disconnect', () => {
+    console.log('disconnected from master', master);
+  });
+}
+
+const PORT = nodeConfig.nodePort || process.env.PORT || 8081;
+getPort({ port: PORT }).then((port) => {
+  server.listen(port, (err) => {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log(`cluster node '${nodeConfig.hostname}' (${nodeConfig.type}) is running at ${port}`);
+    }
+  });
 });
-
-masterClient.on('disconnect',function() {
-	console.log('disconnected from master', master);
-});
-
-//TODO: think if we need http in the first place?
-getPort().then(function(port) {
-	server.listen(port, function(err) {		
-		console.log('live and running at ' + port);
-	});
-})

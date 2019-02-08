@@ -1,0 +1,56 @@
+{
+	"variables": {
+		"crawler-db-connection-string": "mongodb://pyxis:QgGaZXx4hSMm2tXkZOca655u76QrcG0YP8KcS5xxWv7vxKWkplLPKoEPEvpe1bLcRAz1JqCwLkpfF2WyT691FA==@pyxis.documents.azure.com:10255/?ssl=true&replicaSet=globaldb",
+		"gwc-server-start-port": 63000,
+		"gwc-import-start-port": 64000,
+		"gwc-server-count": 8,
+		"gwc-import-count": 1
+	},
+	"products": {
+		"cli": {
+			"product": "cli",
+			"version": "1.0.1",
+			"setup": "pyx.exe config \"-mongo=${crawler-db-connection-string}\""
+		},
+		"gwc":{
+			"product": "gwc",
+			"version": "1.0.10"
+		}
+	},
+	"services": {
+		"cli": {
+			"product": "cli",
+			"exec": "pyx.exe"
+		},
+		"gwc": {
+			"product": "gwc",
+			"exec": "GeoWebCore.exe",
+			"args": [
+				"-fd=${dataPath}",
+				"-cd=${cachePath}"
+			]
+		},
+		"server": {
+			"product": "gwc",
+			"exec": "GeoWebCore.exe",
+			"args": [
+				"-fd=${dataPath}",
+				"-cd=${cachePath}",
+				"http://${ip}:${gwc-server-start-port}+",
+				"-env=Production"
+			],
+			"instancesPerNode": "${gwc-server-count}"
+		},
+		"import": {
+			"product": "gwc",
+			"exec": "GeoWebCore.exe",
+			"args": [
+				"-fd=${dataPath}",
+				"-cd=${cachePath}",
+				"http://${ip}:${gwc-import-start-port}+",
+				"-env=Production"
+			],
+			"instancesPerNode": "${gwc-import-count}"
+		}
+	}
+}

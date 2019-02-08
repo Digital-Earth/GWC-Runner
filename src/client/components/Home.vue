@@ -1,167 +1,205 @@
 <template>
 	<div class="home">
-        <v-container grid-list-md text-xs-center>
-            <v-layout row wrap text-xl-left>
-                <v-flex xs12>
-                    <h1>Services</h1>
-                </v-flex>
-            </v-layout>
+    <v-container grid-list-md text-xs-center>
 
-            <v-layout row wrap>
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Cluster</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-3">
-                                {{state.connected?'connected':'disconnected'}}
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+      <v-layout row wrap text-xl-left>
+          <v-flex xs12>
+              <h1>Deployment</h1>
+          </v-flex>
+      </v-layout>
 
+      <v-layout row wrap>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Deployment</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-2">
+                <span v-if="state.deployment">{{state.deployment.name}} {{state.deployment.version}}</span>
+                <span v-else>No Active deployment set</span>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Proxy</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-3">
-                                <toggle-button @change="toggleProxy" :sync="true" :value="proxyRunning"></toggle-button> Proxy
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Status</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-2">
+                <span>{{running?"Running":"Idle"}}</span>
+                <v-btn :color="running?'red':'success'" large @click="toggleRunning">
+                  <span>{{running?"Stop":"Start"}}</span><v-icon right large>{{running?'stop':'play_arrow'}}</v-icon>
+                </v-btn>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">GWC</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-3">
-                                <toggle-button @change="toggleGWC" :sync="true" :value="gwcRunning"></toggle-button> GWC
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Open</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-2" v-if="endpoints.proxy">
+                <a :href="`${endpoints.proxy[0]}`" target="blank">{{endpoints["proxy"][0]}}</a>
+              </div>
+              <div class="display-2" v-else>
+                No entry point
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-            </v-layout>
+      </v-layout>
 
-            <v-layout row wrap text-xl-left>
-                <v-flex xs12>
-                    <h1>Data</h1>
-                </v-flex>
-            </v-layout>
+      <!--
+      <v-layout row wrap text-xl-left>
+        <v-flex xs12>
+          <h1>Data</h1>
+        </v-flex>
+      </v-layout>
 
-            <v-layout row wrap>
-                
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%" to="/datasets">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Roots</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-4">{{roots.roots | number}}</div>
-                            <div class="graph">
-                                <vue-chart type="horizontalBar" :data="rootsData" :options="chartOptions"></vue-chart>
-                            </div>
-                            <v-container grid-list-md text-xs-center>
-                                <v-layout row wrap>
-                                    <v-flex>Discovered: {{roots.discovered | number}}</v-flex>
-                                    <v-flex>New: {{roots.new | number}}</v-flex>
-                                    <v-flex>Broken: {{roots.broken | number}}</v-flex>
-                                </v-layout>
-                            </v-container>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+      <v-layout row wrap>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%" to="/datasets">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Roots</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-4">{{roots.roots | number}}</div>
+              <div class="graph">
+                <vue-chart type="horizontalBar" :data="rootsData" :options="chartOptions"></vue-chart>
+              </div>
+              <v-container grid-list-md text-xs-center>
+                <v-layout row wrap>
+                  <v-flex>Discovered: {{roots.discovered | number}}</v-flex>
+                  <v-flex>New: {{roots.new | number}}</v-flex>
+                  <v-flex>Broken: {{roots.broken | number}}</v-flex>
+                </v-layout>
+              </v-container>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%" to="/datasets">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Datasets</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-4">{{datasets.datasets | number}}</div>
-                            <div class="graph">
-                                <vue-chart type="horizontalBar" :data="datasetsData" :options="chartOptions"></vue-chart>
-                            </div>
-                            <v-container grid-list-md text-xs-center>
-                                <v-layout row wrap>
-                                    <v-flex>Verified: {{datasets.verified | number}}</v-flex>
-                                    <v-flex>Unknown: {{datasets.unknown | number}}</v-flex>
-                                    <v-flex>Broken: {{datasets.broken | number}}</v-flex>
-                                </v-layout>
-                            </v-container>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%" to="/datasets">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Datasets</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-4">{{datasets.datasets | number}}</div>
+              <div class="graph">
+                <vue-chart type="horizontalBar" :data="datasetsData" :options="chartOptions"></vue-chart>
+              </div>
+              <v-container grid-list-md text-xs-center>
+                <v-layout row wrap>
+                  <v-flex>Verified: {{datasets.verified | number}}</v-flex>
+                  <v-flex>Unknown: {{datasets.unknown | number}}</v-flex>
+                  <v-flex>Broken: {{datasets.broken | number}}</v-flex>
+                </v-layout>
+              </v-container>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%" to="/datasets">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Freshness</div>
-                        </v-card-title>
-                        <div class="graph big">
-                            <vue-chart type="bar" :data="rootsFreshness" :options="bigChartOptions"></vue-chart>
-                        </div>
-                        <v-container grid-list-md text-xs-center>
-                                <v-layout row wrap>
-                                    <v-flex>Coverage: {{rootsFreshness.precentage}}%</v-flex>
-                                    <v-flex>Average Root Freshness: {{rootsFreshness.average}} days ago</v-flex>
-                                </v-layout>
-                            </v-container>
-                    </v-card>
-                </v-flex>
-            </v-layout>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%" to="/datasets">
+            <v-card-title primary-title >
+              <div class="headline text-xs-center">Freshness</div>
+            </v-card-title>
+            <div class="graph big">
+              <vue-chart type="bar" :data="rootsFreshness" :options="bigChartOptions"></vue-chart>
+            </div>
+            <v-container grid-list-md text-xs-center>
+              <v-layout row wrap>
+                <v-flex>Coverage: {{rootsFreshness.precentage}}%</v-flex>
+                <v-flex>Average Root Freshness: {{rootsFreshness.average}} days ago</v-flex>
+              </v-layout>
+            </v-container>
+          </v-card>
+        </v-flex>
+      </v-layout>
 
-            <v-layout row wrap text-xl-left>
-                <v-flex xs12>
-                    <h1>Cluster</h1>
-                </v-flex>
-            </v-layout>
+      -->
+    <v-layout row wrap text-xl-left>
+        <v-flex xs12>
+          <h1>Cluster</h1>
+      </v-flex>
+    </v-layout>
 
-            <v-layout row wrap>
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%" to="/cluster">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Nodes</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-4">{{nodesCount}}</div>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+    <v-layout row wrap>
+      <v-flex xs4>
+        <v-card dark color="secondary" hover height="100%">
+          <v-card-title primary-title >
+            <div class="headline text-xs-center">Cluster</div>
+          </v-card-title>
+          <v-card-text class="px-0">
+            <div class="display-3">
+              {{state.connected?'connected':'disconnected'}}
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-flex>
 
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%" to="/cluster">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Jobs</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-4">{{runningJobs}}</div>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+      <v-flex xs2>
+        <v-card dark color="secondary" hover height="100%" to="/cluster">
+          <v-card-title primary-title >
+            <div class="headline text-xs-center">Nodes</div>
+          </v-card-title>
+          <v-card-text class="px-0">
+            <div class="display-4">{{nodesCount}}</div>
+          </v-card-text>
+        </v-card>
+      </v-flex>
 
-                <v-flex xs4>
-                    <v-card dark color="secondary" hover height="100%" to="/cluster">
-                        <v-card-title primary-title >
-                            <div class="headline text-xs-center">Tasks</div>
-                        </v-card-title>
-                        <v-card-text class="px-0">
-                            <div class="display-4">{{runningTasks}}</div>
-                        </v-card-text>
-                    </v-card>
-                </v-flex>
+      <v-flex xs2>
+        <v-card dark color="secondary" hover height="100%" to="/cluster">
+          <v-card-title primary-title >
+            <div class="headline text-xs-center">Jobs</div>
+          </v-card-title>
+          <v-card-text class="px-0">
+            <div class="display-4">{{runningJobs}}</div>
+          </v-card-text>
+        </v-card>
+      </v-flex>
 
-            </v-layout>
+      <v-flex xs2>
+        <v-card dark color="secondary" hover height="100%" to="/cluster">
+          <v-card-title primary-title >
+            <div class="headline text-xs-center">Tasks</div>
+          </v-card-title>
+          <v-card-text class="px-0">
+            <div class="display-4">{{runningTasks}}</div>
+          </v-card-text>
+        </v-card>
+      </v-flex>
 
-        </v-container>
-    </div>
+      <v-flex xs2>
+        <v-card dark color="secondary" hover height="100%" to="/cluster">
+          <v-card-title primary-title >
+            <div class="headline text-xs-center">Usage</div>
+          </v-card-title>
+          <v-card-text class="px-0">
+            <div class="usage-bar">
+              CPU
+              <div class="bar cpu" :style="{height:cpu +'%'}"></div>
+            </div>
+
+            <div class="usage-bar">
+              MEM
+              <div class="bar mem" :style="{height:memory +'%'}"></div>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-flex>
+    </v-layout>
+  </v-container>
+  </div>
 </template>
 
 <script>
@@ -228,23 +266,20 @@ export default {
           enabled: true
         }
       },
-      gwcRunning: store.state.services.gwc ? true : false,
-      proxyRunning: store.state.services.proxy ? true : false
+      running: store.state.deploymentRunning ? true : false,
     };
   },
+  watch: {
+    'state.deploymentRunning': function(value) {
+      this.running = value;
+    }
+  },
   methods: {
-    toggleGWC(event) {
-      if (event.value) {
-        this.$socket.emit("start-gwc");
+    toggleRunning() {
+      if (!this.running) {
+        this.$socket.emit("start-deployment");
       } else {
-        this.$socket.emit("stop-gwc");
-      }
-    },
-    toggleProxy(event) {
-      if (event.value) {
-        this.$socket.emit("start-proxy");
-      } else {
-        this.$socket.emit("stop-proxy");
+        this.$socket.emit("stop-deployment");
       }
     }
   },
@@ -330,7 +365,7 @@ export default {
       labels[0] = 'Today';
       labels.reverse();
       freshness.reverse();
-      
+
 
       return {
         labels: labels,
@@ -377,6 +412,38 @@ export default {
       });
       return count;
     },
+    cpu: function() {
+      let cpu = 0;
+      this.state.tasks.forEach(task => {
+        if (task.status != "done") {
+          cpu += task.usage.cpu;
+        }
+      });
+      return cpu / this.state.totalCpu;
+    },
+    memory: function() {
+      let memory = 0;
+      this.state.tasks.forEach(task => {
+        if (task.status != "done") {
+          memory += task.usage.memory;
+        }
+      });
+      return memory / (1024 * 1024 * 1024 * this.state.totalMemory) * 100;
+    },
+    endpoints: function() {
+      let endpoints = {};
+      this.state.tasks.forEach(task => {
+        if (task.endpoints && task.status != "done") {
+          for(let key in task.endpoints) {
+            if (!(key in endpoints)) {
+              endpoints[key] = [];
+            }
+            endpoints[key].push(task.endpoints[key])
+          }
+        }
+      });
+      return endpoints;
+    },
     nodesCount: function() {
       return this.state.nodes.length;
     }
@@ -398,4 +465,31 @@ export default {
 .graph.big {
   height: 160px;
 }
+
+.usage-bar {
+  display: inline-block;
+  position: relative;
+  height: 100px;
+  background: #666;
+  border-radius: 10px;
+  overflow: hidden;
+  width: 50px;
+  margin: 0px 20px;
+}
+
+.usage-bar .bar {
+  position: absolute;
+  width: 100%;
+  bottom: 0;
+
+}
+
+.usage-bar .bar.cpu {
+background: #ffc107;
+}
+
+.usage-bar .bar.mem {
+background: #07ffa5;
+}
+
 </style>
