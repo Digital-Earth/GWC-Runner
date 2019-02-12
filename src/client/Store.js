@@ -4,7 +4,7 @@ const vm = new Vue();
 
 const state = {
   connected: false,
-  deployment: undefined,
+  clusterConfig: undefined,
   deploymentRunning: false,
   urls: [],
   geoSources: [],
@@ -59,5 +59,8 @@ export default {
         state.jobTasks[job.id] = tasks.filter(task => task.status !== 'done' && task.status !== 'lost');
       }
     }
+  },
+  deployment() {
+    return state.clusterConfig.deployment;
   },
 };

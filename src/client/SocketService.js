@@ -22,8 +22,8 @@ export default {
       store.state.geoSources = geosources;
     });
 
-    socket.on('active-deployment', (deployment) => {
-      store.state.deployment = deployment;
+    socket.on('cluster-config', (clusterConfig) => {
+      store.state.clusterConfig = clusterConfig;
     });
 
     socket.on('jobs', (jobs) => {

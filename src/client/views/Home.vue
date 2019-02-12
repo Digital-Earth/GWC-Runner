@@ -1,22 +1,21 @@
 <template>
-	<div class="home">
+  <div class="home">
     <v-container grid-list-md text-xs-center>
-
       <v-layout row wrap text-xl-left>
-          <v-flex xs12>
-              <h1>Deployment</h1>
-          </v-flex>
+        <v-flex xs12>
+          <h1>Deployment</h1>
+        </v-flex>
       </v-layout>
 
       <v-layout row wrap>
         <v-flex xs4>
           <v-card dark color="secondary" hover height="100%">
-            <v-card-title primary-title >
+            <v-card-title primary-title>
               <div class="headline text-xs-center">Deployment</div>
             </v-card-title>
             <v-card-text class="px-0">
               <div class="display-2">
-                <span v-if="state.deployment">{{state.deployment.name}} {{state.deployment.version}}</span>
+                <span v-if="deployment">{{deployment.name}} {{deployment.version}}</span>
                 <span v-else>No Active deployment set</span>
               </div>
             </v-card-text>
@@ -25,14 +24,15 @@
 
         <v-flex xs4>
           <v-card dark color="secondary" hover height="100%">
-            <v-card-title primary-title >
+            <v-card-title primary-title>
               <div class="headline text-xs-center">Status</div>
             </v-card-title>
             <v-card-text class="px-0">
               <div class="display-2">
                 <span>{{running?"Running":"Idle"}}</span>
                 <v-btn :color="running?'red':'success'" large @click="toggleRunning">
-                  <span>{{running?"Stop":"Start"}}</span><v-icon right large>{{running?'stop':'play_arrow'}}</v-icon>
+                  <span>{{running?"Stop":"Start"}}</span>
+                  <v-icon right large>{{running?'stop':'play_arrow'}}</v-icon>
                 </v-btn>
               </div>
             </v-card-text>
@@ -41,20 +41,17 @@
 
         <v-flex xs4>
           <v-card dark color="secondary" hover height="100%">
-            <v-card-title primary-title >
+            <v-card-title primary-title>
               <div class="headline text-xs-center">Open</div>
             </v-card-title>
             <v-card-text class="px-0">
               <div class="display-2" v-if="endpoints.proxy">
                 <a :href="`${endpoints.proxy[0]}`" target="blank">{{endpoints["proxy"][0]}}</a>
               </div>
-              <div class="display-2" v-else>
-                No entry point
-              </div>
+              <div class="display-2" v-else>No entry point</div>
             </v-card-text>
           </v-card>
         </v-flex>
-
       </v-layout>
 
       <!--
@@ -126,86 +123,81 @@
       </v-layout>
 
       -->
-    <v-layout row wrap text-xl-left>
+      <v-layout row wrap text-xl-left>
         <v-flex xs12>
           <h1>Cluster</h1>
-      </v-flex>
-    </v-layout>
+        </v-flex>
+      </v-layout>
 
-    <v-layout row wrap>
-      <v-flex xs4>
-        <v-card dark color="secondary" hover height="100%">
-          <v-card-title primary-title >
-            <div class="headline text-xs-center">Cluster</div>
-          </v-card-title>
-          <v-card-text class="px-0">
-            <div class="display-3">
-              {{state.connected?'connected':'disconnected'}}
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-flex>
+      <v-layout row wrap>
+        <v-flex xs4>
+          <v-card dark color="secondary" hover height="100%">
+            <v-card-title primary-title>
+              <div class="headline text-xs-center">Cluster</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-3">{{state.connected?'connected':'disconnected'}}</div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-      <v-flex xs2>
-        <v-card dark color="secondary" hover height="100%" to="/cluster">
-          <v-card-title primary-title >
-            <div class="headline text-xs-center">Nodes</div>
-          </v-card-title>
-          <v-card-text class="px-0">
-            <div class="display-4">{{nodesCount}}</div>
-          </v-card-text>
-        </v-card>
-      </v-flex>
+        <v-flex xs2>
+          <v-card dark color="secondary" hover height="100%" to="/cluster">
+            <v-card-title primary-title>
+              <div class="headline text-xs-center">Nodes</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-4">{{nodesCount}}</div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-      <v-flex xs2>
-        <v-card dark color="secondary" hover height="100%" to="/cluster">
-          <v-card-title primary-title >
-            <div class="headline text-xs-center">Jobs</div>
-          </v-card-title>
-          <v-card-text class="px-0">
-            <div class="display-4">{{runningJobs}}</div>
-          </v-card-text>
-        </v-card>
-      </v-flex>
+        <v-flex xs2>
+          <v-card dark color="secondary" hover height="100%" to="/cluster">
+            <v-card-title primary-title>
+              <div class="headline text-xs-center">Jobs</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-4">{{runningJobs}}</div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-      <v-flex xs2>
-        <v-card dark color="secondary" hover height="100%" to="/cluster">
-          <v-card-title primary-title >
-            <div class="headline text-xs-center">Tasks</div>
-          </v-card-title>
-          <v-card-text class="px-0">
-            <div class="display-4">{{runningTasks}}</div>
-          </v-card-text>
-        </v-card>
-      </v-flex>
+        <v-flex xs2>
+          <v-card dark color="secondary" hover height="100%" to="/cluster">
+            <v-card-title primary-title>
+              <div class="headline text-xs-center">Tasks</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="display-4">{{runningTasks}}</div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
 
-      <v-flex xs2>
-        <v-card dark color="secondary" hover height="100%" to="/cluster">
-          <v-card-title primary-title >
-            <div class="headline text-xs-center">Usage</div>
-          </v-card-title>
-          <v-card-text class="px-0">
-            <div class="usage-bar">
-              CPU
-              <div class="bar cpu" :style="{height:cpu +'%'}"></div>
-            </div>
+        <v-flex xs2>
+          <v-card dark color="secondary" hover height="100%" to="/cluster">
+            <v-card-title primary-title>
+              <div class="headline text-xs-center">Usage</div>
+            </v-card-title>
+            <v-card-text class="px-0">
+              <div class="usage-bar">CPU
+                <div class="bar cpu" :style="{height:cpu +'%'}"></div>
+              </div>
 
-            <div class="usage-bar">
-              MEM
-              <div class="bar mem" :style="{height:memory +'%'}"></div>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-flex>
-    </v-layout>
-  </v-container>
+              <div class="usage-bar">MEM
+                <div class="bar mem" :style="{height:memory +'%'}"></div>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
+      </v-layout>
+    </v-container>
   </div>
 </template>
 
 <script>
 import VueChart from "vue-chart";
 import store from "../Store";
-import ToggleButton from "./ToggleButton.vue";
 
 export default {
   name: "home",
@@ -266,11 +258,11 @@ export default {
           enabled: true
         }
       },
-      running: store.state.deploymentRunning ? true : false,
+      running: store.state.deploymentRunning ? true : false
     };
   },
   watch: {
-    'state.deploymentRunning': function(value) {
+    "state.deploymentRunning": function(value) {
       this.running = value;
     }
   },
@@ -284,6 +276,13 @@ export default {
     }
   },
   computed: {
+    deployment: function() {
+      if (this.state.clusterConfig) {
+        return this.state.clusterConfig.deployment;
+      } else {
+        return undefined;
+      }
+    },
     datasets: function() {
       return store.aggregate(
         this.state.urls,
@@ -351,9 +350,10 @@ export default {
           lastDiscovered.getMonth(),
           lastDiscovered.getDate()
         );
-        let diffInDays = (now.getTime() - lastDiscovered.getTime()) / 1000 / 60 / 60 / 24;
+        let diffInDays =
+          (now.getTime() - lastDiscovered.getTime()) / 1000 / 60 / 60 / 24;
         if (diffInDays > 30) {
-            return;
+          return;
         }
         freshness[diffInDays]++;
         average += diffInDays;
@@ -362,16 +362,15 @@ export default {
 
       average = Math.round(average / total);
 
-      labels[0] = 'Today';
+      labels[0] = "Today";
       labels.reverse();
       freshness.reverse();
-
 
       return {
         labels: labels,
         total: total,
         average: average,
-        precentage: Math.floor(total * 100 / (this.roots.roots || 1)),
+        precentage: Math.floor((total * 100) / (this.roots.roots || 1)),
         datasets: [
           {
             label: "roots",
@@ -428,17 +427,17 @@ export default {
           memory += task.usage.memory;
         }
       });
-      return memory / (1024 * 1024 * 1024 * this.state.totalMemory) * 100;
+      return (memory / (1024 * 1024 * 1024 * this.state.totalMemory)) * 100;
     },
     endpoints: function() {
       let endpoints = {};
       this.state.tasks.forEach(task => {
         if (task.endpoints && task.status != "done") {
-          for(let key in task.endpoints) {
+          for (let key in task.endpoints) {
             if (!(key in endpoints)) {
               endpoints[key] = [];
             }
-            endpoints[key].push(task.endpoints[key])
+            endpoints[key].push(task.endpoints[key]);
           }
         }
       });
@@ -453,7 +452,7 @@ export default {
       return number.toLocaleString();
     }
   },
-  components: { ToggleButton, VueChart }
+  components: { VueChart }
 };
 </script>
 <style>
@@ -481,15 +480,13 @@ export default {
   position: absolute;
   width: 100%;
   bottom: 0;
-
 }
 
 .usage-bar .bar.cpu {
-background: #ffc107;
+  background: #ffc107;
 }
 
 .usage-bar .bar.mem {
-background: #07ffa5;
+  background: #07ffa5;
 }
-
 </style>

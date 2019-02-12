@@ -1,19 +1,24 @@
 <template>
-	<div>
+  <div>
     <v-container>
-      <v-layout row align-baseline="">
+      <v-layout row align-baseline>
         <v-flex xs7>
           <h2>GeoSources</h2>
         </v-flex>
         <v-flex xs4>
-          <v-text-field label="Search" v-model="search" prepend-icon="search" @keypress.enter="searchGeoSources"></v-text-field>
+          <v-text-field
+            label="Search"
+            v-model="search"
+            prepend-icon="search"
+            @keypress.enter="searchGeoSources"
+          ></v-text-field>
         </v-flex>
         <v-flex xs1>
           <v-btn round color="primary" @click="searchGeoSources">Search</v-btn>
         </v-flex>
         <!-- <v-flex xs1>
           <v-btn round color="primary">Last Activity</v-btn>
-        </v-flex> -->
+        </v-flex>-->
       </v-layout>
     </v-container>
 
@@ -21,7 +26,11 @@
       <v-layout row wrap>
         <v-flex xs2 pa-2 v-for="geoSource in geoSources" :key="geoSource.Id">
           <v-card light>
-            <v-card-media cover :src="`http://pyxis.globalgridsystems.com/images/pipelines/thumbnails/${geoSource.Id}.jpg`" height="180"></v-card-media>
+            <v-card-media
+              cover
+              :src="`http://pyxis.globalgridsystems.com/images/pipelines/thumbnails/${geoSource.Id}.jpg`"
+              height="180"
+            ></v-card-media>
             <v-card-title class="ellipsis">{{geoSource.Metadata.Name}}</v-card-title>
             <v-card-actions>
               <v-btn flat color="orange" @click="open(geoSource)">Open</v-btn>
@@ -50,7 +59,7 @@
         </v-flex>
       </v-layout>
     </v-container>
-		
+
     <!--
 		<button @click="startGalleryStatusStatusJob()">Refresh</button>
 		<div>
@@ -69,7 +78,7 @@
 			</div>
 		</div>
     -->
-	</div>
+  </div>
 </template>
 
 <script>
@@ -87,13 +96,14 @@ export default {
   },
   methods: {
     searchGeoSources() {
-      let url = 'https://ls-api.globalgridsystems.com/api/v1/GeoSource?$orderby=Metadata/Updated%20desc';
+      let url =
+        "https://ls-api.globalgridsystems.com/api/v1/GeoSource?$orderby=Metadata/Updated%20desc";
       if (this.search) {
-        url += "&search="+encodeURIComponent(this.search)
+        url += "&search=" + encodeURIComponent(this.search);
       }
       this.$http.get(url).then(response => {
         this.geoSources = response.body.Items;
-      })
+      });
     },
     // startGalleryStatusStatusJob() {
     //   this.$socket.emit("start-gallery-status");
