@@ -65,7 +65,11 @@
       </v-layout>
     </v-container>
 
-    <h2 class="space">Nodes</h2>
+    <h2 class="space">Nodes
+      <v-btn round color="primary" @click="startNewNode()">
+        <v-icon>add</v-icon>
+      </v-btn>
+    </h2>
 
     <v-container grid-list-xl>
       <v-layout row wrap>
@@ -270,6 +274,9 @@ export default {
         name: deployment.name,
         version: deployment.version
       });
+    },
+    startNewNode() {
+      this.$socket.emit("start-new-node");
     }
   },
   filters: {

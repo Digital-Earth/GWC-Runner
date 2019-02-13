@@ -2,7 +2,10 @@ const clone = require('clone');
 const extend = require('extend');
 const uuid = require('uuid/v4');
 const ee = require('event-emitter');
-const { StatusCodes, MutableState } = require('./MutableState');
+const {
+  StatusCodes,
+  MutableState
+} = require('./MutableState');
 
 const serverContext = require('./ServerContext');
 
@@ -42,7 +45,9 @@ class Action {
     options = extend({}, options);
     if (!options.while) {
       // eslint-disable-next-line no-param-reassign
-      options.while = function () { return true; };
+      options.while = function () {
+        return true;
+      };
     }
     return this.invoke(task, options);
   }
@@ -186,7 +191,9 @@ class PromiseAction extends Action {
 
     // eslint-disable-next-line no-param-reassign
     options = options || {};
-    this.while = options.while || function () { return false; };
+    this.while = options.while || function () {
+      return false;
+    };
 
     const self = this;
 
@@ -242,7 +249,9 @@ class TaskAction extends Action {
 
     // eslint-disable-next-line no-param-reassign
     options = options || {};
-    this.while = options.while || function () { return false; };
+    this.while = options.while || function () {
+      return false;
+    };
 
     this.publish = options.publish;
 
@@ -264,6 +273,9 @@ class TaskAction extends Action {
         self.details.env = {};
       }
       self.details.env.GGS_JOB = rootJob.id;
+      if (rootJob.state.state.config) {
+        self.details.env.GGS_JOB_CONFIG = JSON.stringify(rootJob.state.state.config);
+      }
 
       serverContext.cluster.start(self.details, (state) => {
         self.task = state;

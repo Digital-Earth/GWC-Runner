@@ -8,14 +8,22 @@
       </v-layout>
     </v-container>
     <v-container grid-list-md v-else>
-      <auth0 :authentication="clusterConfig.authentication"/>
+      <v-layout row wrap>
+        <v-flex xs6>
+          <cluster-details :details="clusterConfig.details"/>
+        </v-flex>
+        <v-flex xs6>
+          <authentication :authentication="clusterConfig.authentication"/>
+        </v-flex>
+      </v-layout>
     </v-container>
   </div>
 </template>
 
 <script>
 import store from "../Store";
-import auth0 from "../components/AuthSettings.vue";
+import clusterDetails from "../components/SettingsDetails.vue";
+import authentication from "../components/SettingsAuth.vue";
 
 export default {
   name: "settings",
@@ -31,7 +39,8 @@ export default {
     }
   },
   components: {
-    auth0
+    clusterDetails,
+    authentication
   }
 };
 </script>

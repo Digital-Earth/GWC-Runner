@@ -1,7 +1,10 @@
 const path = require('path');
 const clone = require('clone');
 const extend = require('extend');
-const { ensureDirectoryExists, getDeploymentDetails } = require('../utils');
+const {
+  ensureDirectoryExists,
+  getDeploymentDetails
+} = require('../utils');
 const es6template = require('es6-template');
 const serverContext = require('./ServerContext');
 
