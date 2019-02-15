@@ -1,3 +1,4 @@
+/* globals window,Vue */
 import store from './Store';
 
 export default {
@@ -22,8 +23,8 @@ export default {
       store.state.geoSources = geosources;
     });
 
-    socket.on('active-deployment', (deployment) => {
-      store.state.deployment = deployment;
+    socket.on('cluster-config', (clusterConfig) => {
+      store.state.clusterConfig = clusterConfig;
     });
 
     socket.on('jobs', (jobs) => {
@@ -91,8 +92,8 @@ export default {
     function updateRunningServices() {
       store.state.deploymentRunning = false;
       let deploymentId = '';
-      if (store.state.deployment) {
-        deploymentId = `${store.state.deployment.name}:${store.state.deployment.version}`;
+      if (store.state.clusterConfig && store.state.clusterConfig.deployment) {
+        deploymentId = `${store.state.clusterConfig.deployment.name}:${store.state.clusterConfig.deployment.version}`;
       }
       store.state.jobTasks = {};
       const jobNames = {};
