@@ -1,11 +1,13 @@
 <template>
   <v-card dark color="secondary" hover height="100%">
-    <v-card-title primary-title class="headline">{{ providerName }}</v-card-title>
+    <v-card-title primary-title class="headline">Authentication</v-card-title>
     <v-card-text>
-      <v-text-field label="Provider" :value="providerName" readonly></v-text-field>
-      <v-text-field label="Domain" v-model="appDomain" clearable></v-text-field>
-      <v-text-field label="Client ID" v-model="appClientID" clearable></v-text-field>
-      <v-text-field label="Audience" v-model="appAudience" clearable></v-text-field>
+      <v-select label="Provider" v-model="providerName" :items="providers"></v-select>
+      <template v-if="providerName == 'Auth0'">
+        <v-text-field label="Domain" v-model="appDomain" clearable></v-text-field>
+        <v-text-field label="Client ID" v-model="appClientID" clearable></v-text-field>
+        <v-text-field label="Audience" v-model="appAudience" clearable></v-text-field>
+      </template>
     </v-card-text>
     <v-divider/>
     <v-card-actions>
@@ -26,6 +28,8 @@ export default {
   },
   data() {
     return {
+      providers: [ "None", "Auth0"],
+      providerName: this.authentication ? this.authentication.provider : "None",
       appDomain: this.authentication ? this.authentication.settings.domain : "",
       appClientID: this.authentication
         ? this.authentication.settings.clientID
@@ -42,14 +46,18 @@ export default {
       this.appAudience = this.authentication.settings.audience;
     },
     appSubmit() {
-      this.$socket.emit("set-authentication-config", {
-        provider: this.providerName,
-        settings: {
-          domain: this.appDomain.trim(),
-          clientID: this.appClientID.trim(),
-          audience: this.appAudience.trim()
-        }
-      });
+      if (this.providerName != "None") {
+        this.$socket.emit("set-authentication-config", {
+          provider: this.providerName,
+          settings: {
+            domain: this.appDomain.trim(),
+            clientID: this.appClientID.trim(),
+            audience: this.appAudience.trim()
+          }
+        });
+      } else {
+        this.$socket.emit("set-authentication-config", undefined);
+      }
     }
   },
   computed: {

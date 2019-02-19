@@ -15,8 +15,10 @@
             </v-card-title>
             <v-card-text class="px-0">
               <div class="display-2">
-                <span v-if="deployment">{{deployment.name}} {{deployment.version}}</span>
-                <span v-else>No Active deployment set</span>
+                <router-link to="/deployments">
+                  <span v-if="deployment">{{deployment.name}} {{deployment.version}}</span>
+                  <span v-else>Set Active deployment</span>
+                </router-link>
               </div>
             </v-card-text>
           </v-card>
@@ -30,7 +32,7 @@
             <v-card-text class="px-0">
               <div class="display-2">
                 <span>{{running?"Running":"Idle"}}</span>
-                <v-btn :color="running?'red':'success'" large @click="toggleRunning">
+                <v-btn :disabled="!deployment" :color="running?'red':'success'" large @click="toggleRunning">
                   <span>{{running?"Stop":"Start"}}</span>
                   <v-icon right large>{{running?'stop':'play_arrow'}}</v-icon>
                 </v-btn>

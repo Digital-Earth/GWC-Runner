@@ -15,6 +15,8 @@ const oldAttach = Api.attach;
 Api.attach = (server, app) => {
   if (fs.existsSync(clusterConfigFile)) {
     serverContext.clusterConfig = JSON.parse(fs.readFileSync(clusterConfigFile, 'utf8'));
+  } else {
+    serverContext.clusterConfig = {};
   }
 
   const io = oldAttach(server, app);

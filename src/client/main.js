@@ -2,6 +2,8 @@ import Vue from 'vue';
 import VueRouter from 'vue-router';
 import VueResource from 'vue-resource';
 import Vuetify from 'vuetify';
+import 'vuetify/dist/vuetify.css';
+
 import App from './App.vue';
 import SocketService from './SocketService';
 
@@ -10,7 +12,10 @@ import Deployments from './views/Deployments.vue';
 import Cluster from './views/Cluster.vue';
 import Settings from './views/Settings.vue';
 
-import 'vuetify/dist/vuetify.css';
+
+import './assets/favicon-16x16.png';
+import './assets/favicon-32x32.png';
+import './assets/favicon.ico';
 
 Vue.use(VueResource);
 Vue.use(VueRouter);

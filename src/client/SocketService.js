@@ -8,6 +8,9 @@ export default {
 
     socket.on('connect', () => {
       store.state.connected = true;
+
+      // get list of deployments first thing we do
+      socket.emit('start-list-nodes');
     });
     socket.on('disconnect', () => {
       store.state.connected = false;
