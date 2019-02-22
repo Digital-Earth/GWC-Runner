@@ -2,13 +2,12 @@ const Job = require('./Job');
 const es6template = require('es6-template');
 const { getDeploymentDetails } = require('../utils');
 const serverContext = require('./ServerContext');
-const clone = require('clone');
 
 function createDeploymentJob(deployment) {
   const id = `${deployment.name}:${deployment.version}`;
   const job = new Job(id, id);
   const deploymentDetails = getDeploymentDetails(deployment, serverContext.nodeConfig);
-  job.state.mutateState('config', clone(serverContext.clusterConfig));
+  job.state.mutateState('config', serverContext.clusterConfig);
 
   function buildDesiredState() {
     const desiredState = {};

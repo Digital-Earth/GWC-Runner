@@ -52,7 +52,6 @@
     },
     "proxy": {
       "product": "proxy",
-      "version": "1.0.4",
       "exec": "${nodePath}",
       "env": {
         "PORT": "${proxy-port}"
