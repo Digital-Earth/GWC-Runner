@@ -9,17 +9,17 @@
   "products": {
     "cli": {
       "product": "cli",
-      "version": "1.0.28",
+      "version": "1.0.29",
       "setup": "pyx.exe config \"-mongo=${crawler-db-connection-string}\""
     },
     "ui": {
       "product": "ui",
-      "version": "1.0.21",
+      "version": "1.0.22",
       "setup": "npm i"
     },
     "proxy": {
       "product": "proxy",
-      "version": "1.0.11",
+      "version": "1.0.12",
       "setup": "npm i"
     }
   },
