@@ -1,4 +1,7 @@
+const pck = require('../../package.json');
+
 module.exports = {
+  version: pck.version,
   production: false,
   clusterConfigFile: 'cluster.config.json',
   repo: {

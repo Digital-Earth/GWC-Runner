@@ -78,6 +78,7 @@
             <v-card-title>
               <div class="display-1">{{node | nodeId}}</div>
               <div class="body-1 grey--text"># {{node.id}}</div>
+              <div class="body-1 grey--text">version: {{node.version}}</div>
             </v-card-title>
             <v-card-text>
               <v-expansion-panel light>

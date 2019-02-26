@@ -68,6 +68,7 @@ Api.attach = (server, app) => {
   }
 
   function sendInitialUpdate() {
+    io.emit('version', config.version);
     io.emit('tasks', serverContext.cluster.tasks().map(transformTask));
     io.emit('roots', serverContext.roots || []);
     io.emit('nodes', serverContext.nodes || []);

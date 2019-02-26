@@ -3,7 +3,7 @@
     <v-app id="runner" dark>
       <v-toolbar app fixed>
         <v-toolbar-side-icon @click="nav=!nav"></v-toolbar-side-icon>
-        <v-toolbar-title>Global Grid Systems</v-toolbar-title>
+        <v-toolbar-title>Global Grid Systems <span v-if="state.version" class="subheading grey--text pl-4">(version: {{state.version}})</span></v-toolbar-title>
         <v-spacer></v-spacer>
         <img src="./assets/logo.png" width="120px">
       </v-toolbar>

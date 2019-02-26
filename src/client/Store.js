@@ -3,6 +3,7 @@ import Vue from 'vue';
 const vm = new Vue();
 
 const state = {
+  version: undefined,
   connected: false,
   clusterConfig: undefined,
   deploymentRunning: false,

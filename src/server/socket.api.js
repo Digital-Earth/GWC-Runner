@@ -29,6 +29,7 @@ Api.attachNodesNamespace = (io, options) => {
       resolveDetails: (details, callback) => taskResolver.resolveDetails(details, callback),
       info: {
         name: `${serverContext.nodeConfig.ip}:${serverContext.nodeConfig.nodePort}`,
+        version: config.version,
         config: serverContext.nodeConfig,
       },
     };
