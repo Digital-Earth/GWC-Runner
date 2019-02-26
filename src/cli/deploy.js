@@ -22,7 +22,7 @@ module.exports = () => {
 
   const options = parseArgs(process.argv.slice(3));
   if (options.d) {
-    function deployDeployment(deployment) {
+    function deployDeployment(deployment, callback) {
       console.log('deployment started');
       console.log('------------------------');
       console.log(beautify(deployment, null, 2, 100));
@@ -36,6 +36,8 @@ module.exports = () => {
         if (products.length === 0) {
           console.log('------------------------');
           console.log('deployment completed');
+          console.log('------------------------');
+          callback(null);
           return;
         }
         const productName = products.shift();
@@ -58,38 +60,63 @@ module.exports = () => {
               cwd: dir,
             }, (error, stdout, stderr) => {
               if (error) {
+                callback(error);
                 console.log(error);
               } else {
                 console.log(stdout, stderr);
+                deployNextService();
               }
-              deployNextService();
             });
           }
         }).catch((error) => {
           console.log('------------------------');
           console.log(`product ${productName} failed to download: ${error}`);
-          deployNextService();
+          callback(error);
         });
       }
 
       deployNextService();
     }
 
+    function postDeployment(deploymentDetails) {
+      return function doPostDeployment(error) {
+        if (error) {
+          console.log(error);
+          process.exit(1);
+        }
+
+        if (options.save && deploymentDetails) {
+          // update cluster configure file
+          let clusterConfig = {};
+          if (fs.existsSync(config.clusterConfigFile)) {
+            clusterConfig = JSON.parse(fs.readFileSync(config.clusterConfigFile, 'utf8'));
+          }
+          clusterConfig.deployment = deploymentDetails;
+          fs.writeFileSync(config.clusterConfigFile, JSON.stringify(clusterConfig, null, 2));
+          console.log(`Update active deployment: ${JSON.stringify(deploymentDetails)}.`);
+        }
+      };
+    }
+
     if (fs.existsSync(options.d)) {
       const deploymentFile = options.d;
       const deployment = JSON.parse(fs.readFileSync(deploymentFile));
       deployment.name = 'local';
-      deployDeployment(deployment);
+      deployDeployment(deployment, postDeployment());
     } else {
       const repo = new Repo(extend({}, config.repo, { path: path.join(nodeConfig.deployments || 'deployments') }));
 
       repo.downloadDeployment(options.d, options.v, (error, result) => {
         if (error) {
           console.log(error);
+          postDeployment(error);
         } else {
           const deployment = JSON.parse(fs.readFileSync(result.filePath));
           deployment.name = `${result.product}.${result.version}`;
-          deployDeployment(deployment);
+          deployDeployment(deployment, postDeployment({
+            name: result.product,
+            version: result.version,
+          }));
         }
       });
     }

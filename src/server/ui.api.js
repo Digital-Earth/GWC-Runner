@@ -1,5 +1,6 @@
 const fs = require('fs');
 const ms = require('ms');
+const config = require('../server/config');
 const serverContext = require('./ServerContext');
 const Job = require('./Job');
 const DeploymentJob = require('./DeploymentJob');
@@ -13,8 +14,8 @@ const Api = require('./socket.api');
 const oldAttach = Api.attach;
 
 Api.attach = (server, app) => {
-  if (fs.existsSync(clusterConfigFile)) {
-    serverContext.clusterConfig = JSON.parse(fs.readFileSync(clusterConfigFile, 'utf8'));
+  if (fs.existsSync(config.clusterConfigFile)) {
+    serverContext.clusterConfig = JSON.parse(fs.readFileSync(config.clusterConfigFile, 'utf8'));
   } else {
     serverContext.clusterConfig = {};
   }

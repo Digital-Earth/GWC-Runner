@@ -56,13 +56,18 @@ usage: node ggs [task]
   ui        - start a local node ui on port 8080
               --local start a local cluster with UI
               --cluster to connect to a remote cluster
+              --autorun to start the active deployment on start
 
   cli      - invoke cli commands on cluster
 
   local    - display list of local deployments
   list     - list available deployments & products on central repository
   upload   - upload deployments & products to central repository
+
   deploy   - deploy deployments & products from central repository
+             -d=deployment-name -v=deployment-version
+             --save - update cluster.config deployment/
+
   remove   - remove local deployment
 
   build    - build project and create zip file ready for deployment
