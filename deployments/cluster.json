@@ -7,6 +7,7 @@
     "gwc-server-start-port": 63000,
     "proxy-port": "1337",
     "ui-port": "62000",
+    "api-explorer-port": "62001",
     "gwc-server-count": 8
   },
   "products": {
@@ -17,12 +18,17 @@
     },
     "ui": {
       "product": "ui",
-      "version": "1.0.24",
+      "version": "1.0.25",
       "setup": "npm i --production"
     },
     "proxy": {
       "product": "proxy",
       "version": "1.0.14",
+      "setup": "npm i --production"
+    },
+    "api-explorer": {
+      "product": "api-explorer",
+      "version": "1.0.1",
       "setup": "npm i --production"
     }
   },
@@ -63,6 +69,17 @@
         "server.js"
       ],
       "instancesPerNode": 1
+    },
+    "api-explorer": {
+      "product": "api-explorer",
+      "exec": "${nodePath}",
+      "env": {
+        "PORT": "${api-explorer-port}"
+      },
+      "args": [
+        "server.js"
+      ],
+      "instances": 1
     }
   }
 }
