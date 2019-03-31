@@ -276,7 +276,7 @@ Api.attach = (server, app) => {
   };
 
   // additional rest API
-  app.get('/jobs/:id', (req, res) => {
+  app.get('/_cluster/jobs/:id', (req, res) => {
     const job = Api.findJob(req.params.id);
     if (job) {
       res.send(JSON.stringify(transformJob(job)));
@@ -312,7 +312,7 @@ Api.attach = (server, app) => {
     }
   }
 
-  app.get('/jobs/:id/discover', (req, res) => {
+  app.get('/_cluster/jobs/:id/discover', (req, res) => {
     const args = ['discover', req.query.reference];
     startNewCliTask(req.params.id, args, (error, task) => {
       if (error) {
@@ -326,7 +326,7 @@ Api.attach = (server, app) => {
     });
   });
 
-  app.get('/jobs/:id/import', (req, res) => {
+  app.get('/_cluster/jobs/:id/import', (req, res) => {
     const args = ['import', req.query.reference];
     startNewCliTask(req.params.id, args, (error, task) => {
       if (error) {
@@ -340,7 +340,7 @@ Api.attach = (server, app) => {
     });
   });
 
-  app.get('/jobs', (req, res) => {
+  app.get('/_cluster/jobs', (req, res) => {
     res.send(JSON.stringify(serverContext.jobs.map(transformJob)));
     res.end();
   });

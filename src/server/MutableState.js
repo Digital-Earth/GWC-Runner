@@ -168,7 +168,7 @@ class MutableState {
 
   mutateLog(value) {
     this.log.push(value);
-    if (this.log.length > 10) {
+    if (this.log.length > 50) {
       this.log.shift();
     }
     this.emit('mutate', {

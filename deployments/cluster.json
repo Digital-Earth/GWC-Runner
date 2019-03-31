@@ -1,4 +1,7 @@
 {
+  "dependencies": {
+    "cluster": "1.2.0"
+  },
   "variables": {
     "crawler-db-connection-string": "mongodb://pyxis:QgGaZXx4hSMm2tXkZOca655u76QrcG0YP8KcS5xxWv7vxKWkplLPKoEPEvpe1bLcRAz1JqCwLkpfF2WyT691FA==@pyxis.documents.azure.com:10255/?ssl=true&replicaSet=globaldb",
     "gwc-server-start-port": 63000,
@@ -9,18 +12,18 @@
   "products": {
     "cli": {
       "product": "cli",
-      "version": "1.0.29",
+      "version": "1.0.31",
       "setup": "pyx.exe config \"-mongo=${crawler-db-connection-string}\""
     },
     "ui": {
       "product": "ui",
-      "version": "1.0.22",
-      "setup": "npm i"
+      "version": "1.0.24",
+      "setup": "npm i --production"
     },
     "proxy": {
       "product": "proxy",
-      "version": "1.0.12",
-      "setup": "npm i"
+      "version": "1.0.14",
+      "setup": "npm i --production"
     }
   },
   "services": {

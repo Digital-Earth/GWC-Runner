@@ -15,7 +15,7 @@ if (!fs.existsSync(configPath)) {
 const nodeConfig = JSON.parse(fs.readFileSync(configPath), 'utf8');
 
 if (options.port) {
-  console.log(`overwrite nodeConfig.port: ${nodeConfig.port} -> ${options.port}`);
+  console.log(`overwrite nodeConfig.port: ${nodeConfig.nodePort} -> ${options.port}`);
   nodeConfig.nodePort = +options.port;
 }
 
