@@ -107,7 +107,7 @@ function getDeploymentDetails(deployment, nodeConfig) {
 
       let deploymentDetails = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
 
-      if (nodeConfig.dev && nodeConfig.override) {
+      if (nodeConfig.override) {
         deploymentDetails = mergeDeployment(deploymentDetails, nodeConfig.override);
       }
 

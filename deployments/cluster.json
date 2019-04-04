@@ -28,7 +28,7 @@
     },
     "api-explorer": {
       "product": "api-explorer",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "setup": "npm i --production"
     }
   },
