@@ -28,4 +28,13 @@ if (nodeConfig.network in ips) {
   nodeConfig.ip = 'localhost';
 }
 
+// ensure directories exists
+if (!fs.existsSync(nodeConfig.dataPath)) {
+  fs.mkdirSync(nodeConfig.dataPath);
+}
+
+if (!fs.existsSync(nodeConfig.cachePath)) {
+  fs.mkdirSync(nodeConfig.cachePath);
+}
+
 module.exports = nodeConfig;

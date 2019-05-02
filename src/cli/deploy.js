@@ -127,6 +127,6 @@ module.exports = () => {
       console.log(error, result);
     });
   } else {
-    console.log('usage: node ggs.js download -p|product=lb [-v|version=1.2.3]');
+    console.log('usage: node ggs.js deploy -p|product=cli -d|deployment=cluster [-v|version=1.2.3] [--save]');
   }
 };
