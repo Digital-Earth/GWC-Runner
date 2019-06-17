@@ -46,7 +46,7 @@ class TaskResolver {
         // resolve arguments from deployment
         if (newDetails.service in deployment.services) {
           const serviceDetails = deployment.services[newDetails.service];
-          const productDetails = deployment.products[serviceDetails.product];
+          const productDetails = deployment.products[serviceDetails.product] || { product: serviceDetails.product, version: 'none' };
 
           let servicePath = path.join(deployment.root, serviceDetails.product);
 
