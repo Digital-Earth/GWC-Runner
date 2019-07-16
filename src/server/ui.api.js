@@ -630,7 +630,8 @@ Api.jobs = {
       cwd: '${rootPath}',
       exec: '${nodePath}',
       args: ['ggs.js', 'deploy', `-d=${details.name}`, `-v=${details.version}`],
-    }).complete();
+    }).invoke(Api.jobs.listNodes(details))
+      .complete();
 
     return job;
   },
@@ -643,7 +644,8 @@ Api.jobs = {
       cwd: '${rootPath}',
       exec: '${nodePath}',
       args: ['ggs.js', 'remove', `-d=${details.name}`, `-v=${details.version}`],
-    }).complete();
+    }).invoke(Api.jobs.listNodes(details))
+      .complete();
 
     return job;
   },
