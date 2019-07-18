@@ -1,42 +1,50 @@
 const os = require('os');
+const path = require('path');
 const fs = require('fs');
 const inquirer = require('inquirer');
 const beautify = require('json-beautify');
 const exec = require('await-exec');
 const { getHostIps } = require('../utils');
+const parseArgs = require('minimist');
 
-const hostname = os.hostname();
-const mem = Math.round((os.totalmem() / 1024 / 1024 / 1024));
-const cpus = os.cpus().length;
 
-const ipsByName = getHostIps();
-const networks = [];
-for (const name in ipsByName) {
-  const network = { name: `${ipsByName[name]} (${name})`, value: name };
-  if (name === 'localhost') {
-    networks.unshift(network);
-  } else {
-    networks.push(network);
-  }
+async function generateDefaults() {
+  const hostname = os.hostname();
+  const mem = Math.round((os.totalmem() / 1024 / 1024 / 1024));
+  const cpus = os.cpus().length;
+
+  const rootPath = path.parse(process.cwd()).root;
+
+  const defaults = {
+    hostname,
+    mem,
+    cpus,
+    rootPath: process.cwd(),
+    nodePath: (await exec('where node')).stdout.trim(),
+    deployments: `${rootPath}GGS\\deployments`,
+    dataPath: `${rootPath}GGS\\gallery`,
+    cachePath: `${rootPath}GGS\\cache`,
+    network: 'all',
+    nodePort: 8080,
+    type: 'node',
+  };
+
+  return defaults;
 }
 
-
-const defaults = {
-  hostname,
-  mem,
-  cpus,
-  network: networks[0],
-  type: 'node',
-  nodePort: 4000,
-  deployments: 'c:\\GGS\\deployments',
-  dataPath: 'c:\\GGS\\gallery',
-  cachePath: 'c:\\GGS\\cache',
-  nodePath: '',
-  rootPath: process.cwd(),
-};
-
 const setup = async () => {
-  defaults.nodePath = (await exec('where node')).stdout.trim();
+  const defaults = await generateDefaults();
+
+  const ipsByName = getHostIps();
+  const networks = [];
+  for (const name in ipsByName) {
+    const network = { name: `${ipsByName[name]} (${name})`, value: name };
+    if (name === 'localhost') {
+      networks.unshift(network);
+    } else {
+      networks.push(network);
+    }
+  }
 
   const config = await inquirer.prompt([
     {
@@ -120,8 +128,50 @@ const setup = async () => {
 };
 
 module.exports = () => {
-  setup().catch((err) => {
-    console.log(err);
-    process.exit(1);
-  });
+  const subCommand = process.argv[3];
+
+  switch (subCommand) {
+    case 'show':
+      {
+        // eslint-disable-next-line global-require
+        const nodeConfig = require('../nodeConfig');
+        console.log(beautify(nodeConfig, null, 2, 50));
+      }
+      break;
+
+    case 'set':
+    case 'unset':
+      {
+        // eslint-disable-next-line global-require
+        const nodeConfig = require('../nodeConfig');
+        const options = parseArgs(process.argv.slice(4));
+        for (const variable in options) {
+          if (variable !== '_') {
+            nodeConfig.override = nodeConfig.override || {};
+            nodeConfig.override.variables = nodeConfig.override.variables || {};
+            if (subCommand === 'set') {
+              nodeConfig.override.variables[variable] = options[variable];
+            } else {
+              delete nodeConfig.override.variables[variable];
+            }
+          }
+        }
+        fs.writeFileSync('node.config.json', beautify(nodeConfig, null, 2, 50));
+        console.log(beautify(nodeConfig.override.variables, null, 2, 50));
+      }
+      break;
+
+    case 'default':
+      generateDefaults().then((nodeConfig) => {
+        fs.writeFileSync('node.config.json', beautify(nodeConfig, null, 2, 50));
+      });
+      break;
+
+    default:
+      setup().catch((err) => {
+        console.log(err);
+        process.exit(1);
+      });
+      break;
+  }
 };

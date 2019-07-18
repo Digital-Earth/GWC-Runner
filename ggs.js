@@ -46,7 +46,11 @@ switch (process.argv[2]) {
 usage: node ggs [task]
   help     - show help screen
 
-  setup    - setup node config
+  setup    - setup node configuration (run this the first time)
+    setup default - generate default configuration
+    setup show - show node configuration
+    setup set|unset [--variable=value] - add|remove deployment variables to override
+
   service  - install node as a service on local machine
 
   serve    - start a local node.

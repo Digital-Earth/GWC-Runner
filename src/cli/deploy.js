@@ -1,6 +1,7 @@
 const parseArgs = require('minimist');
 const extend = require('extend');
 const path = require('path');
+const compareVersions = require('compare-versions');
 const Repo = require('../server/Repo');
 const es6template = require('es6-template');
 const config = require('../server/config');
@@ -8,6 +9,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const beautify = require('json-beautify');
 const nodeConfig = require('../nodeConfig');
+const pck = require('../../package.json');
 
 
 module.exports = () => {
@@ -113,6 +115,19 @@ module.exports = () => {
         } else {
           const deployment = JSON.parse(fs.readFileSync(result.filePath));
           deployment.name = `${result.product}.${result.version}`;
+
+          if (deployment.dependencies && deployment.dependencies.cluster) {
+            if (compareVersions(deployment.dependencies.cluster, pck.version) < 0) {
+              console.log(`Cluster version is ${pck.version}, deployment require ${deployment.dependencies.cluster}`);
+            } else {
+              console.log(`ERROR: cluster version is ${pck.version}, deployment require ${deployment.dependencies.cluster}. Deployment canceled.`);
+              process.exit(-1);
+              return;
+            }
+          } else {
+            console.log('WARNING: deployment file doesn\'t include dependency information. assuming everything is ok.');
+          }
+
           deployDeployment(deployment, postDeployment({
             name: result.product,
             version: result.version,
