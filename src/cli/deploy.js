@@ -117,7 +117,7 @@ module.exports = () => {
           deployment.name = `${result.product}.${result.version}`;
 
           if (deployment.dependencies && deployment.dependencies.cluster) {
-            if (compareVersions(deployment.dependencies.cluster, pck.version) < 0) {
+            if (compareVersions(deployment.dependencies.cluster, pck.version) <= 0) {
               console.log(`Cluster version is ${pck.version}, deployment require ${deployment.dependencies.cluster}`);
             } else {
               console.log(`ERROR: cluster version is ${pck.version}, deployment require ${deployment.dependencies.cluster}. Deployment canceled.`);

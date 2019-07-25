@@ -200,6 +200,7 @@ class Repo {
       metadata: {
         product,
         version,
+        deployment: true,
       },
     }, (error) => {
       if (error) {
