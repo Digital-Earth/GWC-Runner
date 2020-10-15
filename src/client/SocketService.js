@@ -1,16 +1,70 @@
+/* globals window,Vue */
 import store from './Store';
 
 export default {
   install(Vue, options) {
+    function updateRunningServices() {
+      store.state.deploymentRunning = false;
+      let deploymentId = '';
+      if (store.state.clusterConfig && store.state.clusterConfig.deployment) {
+        deploymentId = `${store.state.clusterConfig.deployment.name}:${store.state.clusterConfig.deployment.version}`;
+      }
+      store.state.jobTasks = {};
+      const jobNames = {};
+      store.state.jobs.forEach((job) => {
+        jobNames[job.id] = job.name;
+        if (job.status === 'running') {
+          if (job.id === deploymentId) {
+            store.state.deploymentRunning = true;
+          }
+        }
+        store.state.jobTasks[job.id] = [];
+      });
+
+      store.state.tasks.forEach((task) => {
+        if (task.details.job in jobNames) {
+          store.state.jobTasks[task.details.job].push(task);
+        }
+      });
+    }
+
+    function makeTagsSearchable() {
+      for (const url of store.state.urls) {
+        url.searchText = `${url.url} ${url.tags.join(' ')}`;
+      }
+    }
+
+    function updateUrlsActive() {
+      const activeUrls = {};
+      store.state.tasks.forEach((task) => {
+        if (task.status === 'running' && task.info.url) {
+          activeUrls[task.info.url] = true;
+        }
+      });
+
+      // update urls..
+      store.state.urls.forEach((url) => {
+        url.active = url.url in activeUrls;
+      });
+    }
+
     const socket = window.io();
     Vue.prototype.$socket = socket;
 
     socket.on('connect', () => {
       store.state.connected = true;
+
+      // get list of deployments first thing we do
+      socket.emit('start-list-nodes');
     });
     socket.on('disconnect', () => {
       store.state.connected = false;
     });
+
+    socket.on('version', (version) => {
+      store.state.version = version;
+    });
+
     socket.on('roots', (urls) => {
       store.state.urls = urls;
       makeTagsSearchable();
@@ -22,8 +76,8 @@ export default {
       store.state.geoSources = geosources;
     });
 
-    socket.on('active-deployment', (deployment) => {
-      store.state.deployment = deployment;
+    socket.on('cluster-config', (clusterConfig) => {
+      store.state.clusterConfig = clusterConfig;
     });
 
     socket.on('jobs', (jobs) => {
@@ -87,50 +141,5 @@ export default {
       updateRunningServices();
       store.emit('tasks', store.state.tasks);
     });
-
-    function updateRunningServices() {
-      store.state.deploymentRunning = false;
-      let deploymentId = '';
-      if (store.state.deployment) {
-        deploymentId = `${store.state.deployment.name}:${store.state.deployment.version}`;
-      }
-      store.state.jobTasks = {};
-      const jobNames = {};
-      store.state.jobs.forEach((job) => {
-        jobNames[job.id] = job.name;
-        if (job.status === 'running') {
-          if (job.id === deploymentId) {
-            store.state.deploymentRunning = true;
-          }
-        }
-        store.state.jobTasks[job.id] = [];
-      });
-
-      store.state.tasks.forEach((task) => {
-        if (task.details.job in jobNames) {
-          store.state.jobTasks[task.details.job].push(task);
-        }
-      });
-    }
-
-    function makeTagsSearchable() {
-      for (const url of store.state.urls) {
-        url.searchText = `${url.url} ${url.tags.join(' ')}`;
-      }
-    }
-
-    function updateUrlsActive() {
-      const activeUrls = {};
-      store.state.tasks.forEach((task) => {
-        if (task.status === 'running' && task.info.url) {
-          activeUrls[task.info.url] = true;
-        }
-      });
-
-      // update urls..
-      store.state.urls.forEach((url) => {
-        url.active = url.url in activeUrls;
-      });
-    }
   },
 };

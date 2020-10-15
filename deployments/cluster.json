@@ -1,26 +1,47 @@
 {
+  "dependencies": {
+    "cluster": "1.3.0"
+  },
   "variables": {
     "crawler-db-connection-string": "mongodb://pyxis:QgGaZXx4hSMm2tXkZOca655u76QrcG0YP8KcS5xxWv7vxKWkplLPKoEPEvpe1bLcRAz1JqCwLkpfF2WyT691FA==@pyxis.documents.azure.com:10255/?ssl=true&replicaSet=globaldb",
     "gwc-server-start-port": 63000,
     "proxy-port": "1337",
     "ui-port": "62000",
+    "api-explorer-port": "62001",
+    "static-port": "62002",
+    "account-port": "62003",
     "gwc-server-count": 8
   },
   "products": {
     "cli": {
       "product": "cli",
-      "version": "1.0.27",
+      "version": "1.0.38",
       "setup": "pyx.exe config \"-mongo=${crawler-db-connection-string}\""
     },
     "ui": {
       "product": "ui",
-      "version": "1.0.20",
-      "setup": "npm i"
+      "version": "1.0.36",
+      "setup": "npm i --production"
     },
     "proxy": {
       "product": "proxy",
-      "version": "1.0.11",
-      "setup": "npm i"
+      "version": "1.0.14",
+      "setup": "npm i --production"
+    },
+    "api-explorer": {
+      "product": "api-explorer",
+      "version": "1.0.9",
+      "setup": "npm i --production"
+    },
+    "static": {
+      "product": "static",
+      "version": "1.0.1",
+      "setup": "npm i --production"
+    },
+    "account": {
+      "product": "account",
+      "version": "1.0.0",
+      "setup": "npm i --production"
     }
   },
   "services": {
@@ -52,10 +73,31 @@
     },
     "proxy": {
       "product": "proxy",
-      "version": "1.0.4",
       "exec": "${nodePath}",
       "env": {
         "PORT": "${proxy-port}"
+      },
+      "args": [
+        "server.js"
+      ],
+      "instancesPerNode": 1
+    },
+    "api-explorer": {
+      "product": "api-explorer",
+      "exec": "${nodePath}",
+      "env": {
+        "PORT": "${api-explorer-port}"
+      },
+      "args": [
+        "server.js"
+      ],
+      "instances": 1
+    },
+    "account": {
+      "product": "account",
+      "exec": "${nodePath}",
+      "env": {
+        "PORT": "${account-port}"
       },
       "args": [
         "server.js"

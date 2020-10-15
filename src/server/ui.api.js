@@ -1,20 +1,23 @@
 const fs = require('fs');
 const ms = require('ms');
+const config = require('../server/config');
 const serverContext = require('./ServerContext');
 const Job = require('./Job');
 const DeploymentJob = require('./DeploymentJob');
 
 const createGwcDetails = require('./jobs/gwc');
 
-const activeDeploymentFile = 'cluster.config.json';
+const clusterConfigFile = 'cluster.config.json';
 
 const Api = require('./socket.api');
 
 const oldAttach = Api.attach;
 
 Api.attach = (server, app) => {
-  if (fs.existsSync(activeDeploymentFile)) {
-    Api.activeDeployment = JSON.parse(fs.readFileSync(activeDeploymentFile, 'utf8'));
+  if (fs.existsSync(config.clusterConfigFile)) {
+    serverContext.clusterConfig = JSON.parse(fs.readFileSync(config.clusterConfigFile, 'utf8'));
+  } else {
+    serverContext.clusterConfig = {};
   }
 
   const io = oldAttach(server, app);
@@ -27,7 +30,10 @@ Api.attach = (server, app) => {
       status: task.status,
       details: task.details,
       endpoints: task.endpoints,
-      usage: task.usage || { cpu: 0, memory: 0 },
+      usage: task.usage || {
+        cpu: 0,
+        memory: 0,
+      },
       info: task.state || {},
       log: task.log || [],
     };
@@ -56,16 +62,18 @@ Api.attach = (server, app) => {
     io.emit('job-update', transformJob(job));
   }
 
-  function handleActiveDeployment(/* deployment */) {
-    io.emit('active-deployment', Api.activeDeployment);
+  function handleClusterConfig() {
+    fs.writeFileSync(clusterConfigFile, JSON.stringify(serverContext.clusterConfig, null, 2));
+    io.emit('cluster-config', serverContext.clusterConfig);
   }
 
   function sendInitialUpdate() {
+    io.emit('version', config.version);
     io.emit('tasks', serverContext.cluster.tasks().map(transformTask));
     io.emit('roots', serverContext.roots || []);
     io.emit('nodes', serverContext.nodes || []);
     io.emit('gallery-status', serverContext.geoSources || []);
-    io.emit('active-deployment', Api.activeDeployment);
+    io.emit('cluster-config', serverContext.clusterConfig);
     sendJobs();
   }
 
@@ -140,16 +148,28 @@ Api.attach = (server, app) => {
       }
     });
 
-    socket.on('start-add-url', (url) => {
-      const job = Api.jobs.addUrl({ url });
+    socket.on('start-new-node', () => {
+      const job = Api.jobs.startNewNode();
       Api.trackJob(job);
       job.start();
     });
 
+    socket.on('start-add-url', (url) => {
+      const job = Api.jobs.addUrl({
+        url,
+      });
+      Api.trackJob(job);
+      job.start();
+    });
+
+    socket.on('set-authentication-config', (authentication) => {
+      serverContext.clusterConfig.authentication = authentication;
+      handleClusterConfig();
+    });
+
     socket.on('set-active-deployment', (deployment) => {
-      fs.writeFileSync(activeDeploymentFile, JSON.stringify(deployment));
-      Api.activeDeployment = deployment;
-      handleActiveDeployment();
+      serverContext.clusterConfig.deployment = deployment;
+      handleClusterConfig();
     });
 
     socket.on('start-deploy-deployment', (deployment) => {
@@ -171,25 +191,36 @@ Api.attach = (server, app) => {
     });
 
     socket.on('start-validate', (url) => {
-      const job = Api.jobs.validate({ url });
+      const job = Api.jobs.validate({
+        url,
+      });
       Api.trackJob(job);
       job.start();
     });
 
     socket.on('start-discover', (url) => {
-      const job = Api.jobs.discover({ url });
+      const job = Api.jobs.discover({
+        url,
+      });
       Api.trackJob(job);
       job.start();
     });
 
     socket.on('start-discover-and-validate', (urls, parallel) => {
-      const job = Api.jobs.autoDiscover({ urls, parallel: parallel || 3 });
+      const job = Api.jobs.autoDiscover({
+        urls,
+        parallel: parallel || 3,
+      });
       Api.trackJob(job);
       job.start();
     });
 
     socket.on('update-tags', (url, addTags, removeTags) => {
-      const job = Api.jobs.updateTags({ url, addTags, removeTags });
+      const job = Api.jobs.updateTags({
+        url,
+        addTags,
+        removeTags,
+      });
       Api.trackJob(job);
       job.start();
     });
@@ -211,19 +242,25 @@ Api.attach = (server, app) => {
     /* BEGIN - ALL LEGACY STUFF - CONSIDER REFACTOR */
 
     socket.on('start-download-geosource', (id) => {
-      const job = Api.jobs.gwcDownloadGeoSource({ id });
+      const job = Api.jobs.gwcDownloadGeoSource({
+        id,
+      });
       Api.trackJob(job);
       job.start();
     });
 
     socket.on('start-import-geosource', (id) => {
-      const job = Api.jobs.gwcImportGeoSource({ id });
+      const job = Api.jobs.gwcImportGeoSource({
+        id,
+      });
       Api.trackJob(job);
       job.start();
     });
 
     socket.on('start-gallery-status', (id) => {
-      const job = Api.jobs.gwcGalleryStatus({ id });
+      const job = Api.jobs.gwcGalleryStatus({
+        id,
+      });
       Api.trackJob(job);
       job.start();
     });
@@ -239,7 +276,7 @@ Api.attach = (server, app) => {
   };
 
   // additional rest API
-  app.get('/jobs/:id', (req, res) => {
+  app.get('/_cluster/jobs/:id', (req, res) => {
     const job = Api.findJob(req.params.id);
     if (job) {
       res.send(JSON.stringify(transformJob(job)));
@@ -256,7 +293,9 @@ Api.attach = (server, app) => {
     if (job) {
       const taskAction = job.startNewCliTask(args);
       taskAction.on('start', () => {
-        const { task } = taskAction;
+        const {
+          task,
+        } = taskAction;
         callback(null, {
           id: task.id,
           name: task.name,
@@ -273,7 +312,7 @@ Api.attach = (server, app) => {
     }
   }
 
-  app.get('/jobs/:id/discover', (req, res) => {
+  app.get('/_cluster/jobs/:id/discover', (req, res) => {
     const args = ['discover', req.query.reference];
     startNewCliTask(req.params.id, args, (error, task) => {
       if (error) {
@@ -287,7 +326,7 @@ Api.attach = (server, app) => {
     });
   });
 
-  app.get('/jobs/:id/import', (req, res) => {
+  app.get('/_cluster/jobs/:id/import', (req, res) => {
     const args = ['import', req.query.reference];
     startNewCliTask(req.params.id, args, (error, task) => {
       if (error) {
@@ -301,7 +340,7 @@ Api.attach = (server, app) => {
     });
   });
 
-  app.get('/jobs', (req, res) => {
+  app.get('/_cluster/jobs', (req, res) => {
     res.send(JSON.stringify(serverContext.jobs.map(transformJob)));
     res.end();
   });
@@ -309,7 +348,7 @@ Api.attach = (server, app) => {
 
 Api.startDeployment = (deployment) => {
   Api.stopDeployment();
-  Api.deploymentJob = Api.jobs.runDeployment(deployment || Api.activeDeployment);
+  Api.deploymentJob = Api.jobs.runDeployment(deployment || serverContext.clusterConfig.deployment);
   Api.trackJob(Api.deploymentJob);
   Api.deploymentJob.start();
 };
@@ -327,7 +366,7 @@ Api.jobs = {
 
     job.invoke({
       service: 'cli',
-      deployment: Api.activeDeployment,
+      deployment: serverContext.clusterConfig.deployment,
       args: ['url', 'list', '-json'],
       name: 'list urls',
       state: {
@@ -357,7 +396,7 @@ Api.jobs = {
     const job = new Job('add url');
     job.invoke({
       service: 'cli',
-      deployment: Api.activeDeployment,
+      deployment: serverContext.clusterConfig.deployment,
       args: ['url', 'add', details.url],
       name: `add ${details.url}`,
       state: {
@@ -387,7 +426,7 @@ Api.jobs = {
 
     job.invoke({
       service: 'cli',
-      deployment: Api.activeDeployment,
+      deployment: serverContext.clusterConfig.deployment,
       args,
       state: {
         type: 'update',
@@ -409,7 +448,7 @@ Api.jobs = {
 
     job.invoke({
       service: 'cli',
-      deployment: Api.activeDeployment,
+      deployment: serverContext.clusterConfig.deployment,
       args: ['url', 'discover', details.url],
       name: `discover ${details.url}`,
       state: {
@@ -434,7 +473,7 @@ Api.jobs = {
 
     job.keepAlive(() => job.invoke({
       service: 'cli',
-      deployment: Api.activeDeployment,
+      deployment: serverContext.clusterConfig.deployment,
       args: ['url', 'validate', '-n=50', '-clean', `-skip=${skipDataset}`, details.url],
       name: `validate ${details.url}`,
       state: {
@@ -448,7 +487,8 @@ Api.jobs = {
         if (taskState.state.root) {
           serverContext.emit('root', taskState.state.root);
           return taskState.state.datasets > 0;
-        } if (skipDataset < 10) {
+        }
+        if (skipDataset < 10) {
           skipDataset++;
           return true;
         }
@@ -458,7 +498,7 @@ Api.jobs = {
       if (!taskState.state.root) {
         return job.invoke({
           service: 'cli',
-          deployment: Api.activeDeployment,
+          deployment: serverContext.clusterConfig.deployment,
           args: ['url', 'update', '-status=Broken', details.url],
           name: `update ${details.url}`,
           state: {
@@ -471,7 +511,7 @@ Api.jobs = {
       } else if (taskState.state.root.status === 'Broken') {
         return job.invoke({
           service: 'cli',
-          deployment: Api.activeDeployment,
+          deployment: serverContext.clusterConfig.deployment,
           args: ['url', 'update', '-status=Discovered', details.url],
           state: {
             type: 'update',
@@ -498,8 +538,12 @@ Api.jobs = {
   autoDiscover(details) {
     const job = new Job('auto discover');
 
-    const discoverUrl = url => Api.jobs.discoverAndValidate({ url });
-    const discoverUrlOptions = { parallel: details.parallel || 3 };
+    const discoverUrl = url => Api.jobs.discoverAndValidate({
+      url,
+    });
+    const discoverUrlOptions = {
+      parallel: details.parallel || 3,
+    };
 
     job.forEach(details.urls, discoverUrl, discoverUrlOptions).complete();
 
@@ -511,7 +555,7 @@ Api.jobs = {
     job.invoke({
       name: `download ${details.id}`,
       service: 'gwc',
-      deployment: Api.activeDeployment,
+      deployment: serverContext.clusterConfig.deployment,
       args: ['-d', `pyxis://${details.id}`],
       state: {
         geoSource: details.id,
@@ -528,7 +572,7 @@ Api.jobs = {
     job.invoke({
       name: `download ${details.id}`,
       service: 'gwc',
-      deployment: Api.activeDeployment,
+      deployment: serverContext.clusterConfig.deployment,
       args: ['-import', `pyxis://${details.id}`],
       state: {
         geoSource: details.id,
@@ -586,7 +630,8 @@ Api.jobs = {
       cwd: '${rootPath}',
       exec: '${nodePath}',
       args: ['ggs.js', 'deploy', `-d=${details.name}`, `-v=${details.version}`],
-    }).complete();
+    }).invoke(Api.jobs.listNodes(details))
+      .complete();
 
     return job;
   },
@@ -599,12 +644,26 @@ Api.jobs = {
       cwd: '${rootPath}',
       exec: '${nodePath}',
       args: ['ggs.js', 'remove', `-d=${details.name}`, `-v=${details.version}`],
-    }).complete();
+    }).invoke(Api.jobs.listNodes(details))
+      .complete();
 
     return job;
   },
   runDeployment(deployment) {
     return DeploymentJob(deployment);
+  },
+  startNewNode() {
+    /* eslint-disable no-template-curly-in-string */
+    const job = new Job('node');
+
+    job.invoke({
+      name: 'node',
+      cwd: '${rootPath}',
+      exec: '${nodePath}',
+      args: ['ggs.js', 'serve'],
+    }).complete();
+
+    return job;
   },
 };
 

@@ -15,7 +15,7 @@ if (!fs.existsSync(configPath)) {
 const nodeConfig = JSON.parse(fs.readFileSync(configPath), 'utf8');
 
 if (options.port) {
-  console.log(`overwrite nodeConfig.port: ${nodeConfig.port} -> ${options.port}`);
+  console.log(`overwrite nodeConfig.port: ${nodeConfig.nodePort} -> ${options.port}`);
   nodeConfig.nodePort = +options.port;
 }
 
@@ -26,6 +26,15 @@ if (nodeConfig.network in ips) {
   nodeConfig.ip = ips[nodeConfig.network];
 } else {
   nodeConfig.ip = 'localhost';
+}
+
+// ensure directories exists
+if (!fs.existsSync(nodeConfig.dataPath)) {
+  fs.mkdirSync(nodeConfig.dataPath);
+}
+
+if (!fs.existsSync(nodeConfig.cachePath)) {
+  fs.mkdirSync(nodeConfig.cachePath);
 }
 
 module.exports = nodeConfig;

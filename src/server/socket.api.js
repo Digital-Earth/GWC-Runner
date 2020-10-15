@@ -29,6 +29,7 @@ Api.attachNodesNamespace = (io, options) => {
       resolveDetails: (details, callback) => taskResolver.resolveDetails(details, callback),
       info: {
         name: `${serverContext.nodeConfig.ip}:${serverContext.nodeConfig.nodePort}`,
+        version: config.version,
         config: serverContext.nodeConfig,
       },
     };
@@ -57,17 +58,17 @@ Api.attachNodesNamespace = (io, options) => {
 
 Api.attachRestAPI = (app) => {
   // rest API
-  app.get('/nodes', (req, res) => {
+  app.get('/_cluster/nodes', (req, res) => {
     res.send(JSON.stringify(serverContext.cluster.nodes()));
     res.end();
   });
 
-  app.get('/tasks', (req, res) => {
+  app.get('/_cluster/tasks', (req, res) => {
     res.send(JSON.stringify(serverContext.cluster.tasks()));
     res.end();
   });
 
-  app.get('/tasks/:taskId', (req, res) => {
+  app.get('/_cluster/tasks/:taskId', (req, res) => {
     let task;
     if (req.params.taskId in serverContext.completedTasks) {
       task = serverContext.completedTasks[req.params.taskId];
@@ -92,7 +93,7 @@ Api.attachRestAPI = (app) => {
     }
   });
 
-  app.get('/endpoints', (req, res) => {
+  app.get('/_cluster/endpoints', (req, res) => {
     const endpoints = serverContext.cluster.tasks()
       .filter(task => Object.keys(task.endpoints).length > 0)
       .map(task => ({ endpoints: task.endpoints, details: task.details, state: task.state }));
@@ -100,9 +101,9 @@ Api.attachRestAPI = (app) => {
     res.end();
   });
 
-  app.get('/endpoints/:service/:endpoint', (req, res) => {
+  app.get('/_cluster/endpoints/:service/:endpoint', (req, res) => {
     const endpoints = [];
-    if (req.params.service === 'master' && req.params.endpoint === 'api') {
+    if (req.params.service === 'master' && req.params.endpoint === '_cluster') {
       endpoints.push(serverContext.nodeConfig.master);
     } else {
       serverContext.cluster.tasks()
@@ -150,7 +151,7 @@ Api.attachEndpointsNamespace = (io) => {
     }
 
     // add master endpoint
-    endpoints.master = { api: [serverContext.nodeConfig.master] };
+    endpoints.master = { _cluster: [serverContext.nodeConfig.master] };
 
     return endpoints;
   }
@@ -163,7 +164,7 @@ Api.attachEndpointsNamespace = (io) => {
       if (service in newEndpoints) {
         // service found in new endpoints
         if (service in oldEndpoints) {
-          // and also in the old endpoint, check if there wasa change
+          // and also in the old endpoint, check if there was a change
           if (JSON.stringify(newEndpoints[service]) !== JSON.stringify(oldEndpoints[service])) {
             changes[service] = newEndpoints[service];
           }
@@ -192,6 +193,7 @@ Api.attachEndpointsNamespace = (io) => {
   emitNewEndpoints = debounce(emitNewEndpoints, 500);
 
   io.on('connect', (client) => {
+    console.log('endpoint connected', currentEndpoints);
     client.emit('endpoints', currentEndpoints);
   });
 

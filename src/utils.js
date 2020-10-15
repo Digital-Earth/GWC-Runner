@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const clone = require('clone');
 
 function ensureDirectoryExists(directory) {
   if (fs.existsSync(directory)) {
@@ -53,8 +54,8 @@ function listLocalDeployments(nodeConfig) {
 }
 
 function findDevDeployment(deployment, nodeConfig) {
-  if (nodeConfig.dev && Array.isArray(nodeConfig.deployments)) {
-    for (const dev of nodeConfig.deployments) {
+  if (nodeConfig.dev && Array.isArray(nodeConfig.dev.deployments)) {
+    for (const dev of nodeConfig.dev.deployments) {
       if (dev.name === deployment.name && dev.version === deployment.version) {
         return dev;
       }
@@ -63,9 +64,29 @@ function findDevDeployment(deployment, nodeConfig) {
   return undefined;
 }
 
+function mergeDeployment(...deployments) {
+  const keys = ['variables', 'products', 'services'];
+  const result = {
+    variables: {},
+    products: {},
+    services: {},
+  };
+  for (const deployment of deployments) {
+    if (deployment) {
+      for (const key of keys) {
+        if (key in deployment) {
+          Object.assign(result[key], clone(deployment[key]));
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 function getDeploymentDetails(deployment, nodeConfig) {
   if (!nodeConfig) {
-    throw new Error('please attach nodeConfig before calling getDeploymentDetails');
+    throw new Error('please create nodeConfig before calling getDeploymentDetails');
   }
 
   const key = `${deployment.name}.${deployment.version}`;
@@ -84,9 +105,16 @@ function getDeploymentDetails(deployment, nodeConfig) {
         return undefined;
       }
 
-      const deploymentDetails = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
+      let deploymentDetails = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
+
+      if (nodeConfig.override) {
+        deploymentDetails = mergeDeployment(deploymentDetails, nodeConfig.override);
+      }
+
       deploymentDetails.root = deploymentPath;
       deploymentsCache[key] = deploymentDetails;
+
+      console.log(JSON.stringify(deploymentDetails, null, 2));
     }
   }
 

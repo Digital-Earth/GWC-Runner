@@ -1,7 +1,10 @@
 const path = require('path');
 const clone = require('clone');
 const extend = require('extend');
-const { ensureDirectoryExists, getDeploymentDetails } = require('../utils');
+const {
+  ensureDirectoryExists,
+  getDeploymentDetails,
+} = require('../utils');
 const es6template = require('es6-template');
 const serverContext = require('./ServerContext');
 
@@ -32,9 +35,6 @@ class TaskResolver {
     newDetails.env.GGS_LOGS = logPath;
 
     let variables = extend({}, this.nodeConfig, newDetails.details);
-    if (this.nodeConfig.dev && this.nodeConfig.dev.variables) {
-      variables = extend(variables, this.nodeConfig.dev.variables);
-    }
 
     // resolve path from deployment
     if (newDetails.service && newDetails.deployment) {
@@ -46,7 +46,7 @@ class TaskResolver {
         // resolve arguments from deployment
         if (newDetails.service in deployment.services) {
           const serviceDetails = deployment.services[newDetails.service];
-          const productDetails = deployment.products[serviceDetails.product];
+          const productDetails = deployment.products[serviceDetails.product] || { product: serviceDetails.product, version: 'none' };
 
           let servicePath = path.join(deployment.root, serviceDetails.product);
 
